@@ -144,7 +144,7 @@ export function CursorBlendRing(): ReactNode {
         y = targetY
       }
       const blend = event.target instanceof Element ? event.target.closest('[data-cursor="blend"]') : null
-      ring.classList.toggle(css.cursorRingBlend, blend !== null)
+      ring.classList.toggle(css.cursorRingBlend ?? 'dsh-cursor-blend', blend !== null)
     }
     const onLeave = (): void => {
       visible = false
