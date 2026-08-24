@@ -11,12 +11,10 @@ jobs:
       fail-fast: false
       matrix:
         include:
+          # mac/linux temporarily parked (runner issues 2026-08-24); re-enable
+          # by restoring the two entries below.
           - os: windows-latest
             flags: --win
-          - os: macos-latest
-            flags: --mac
-          - os: ubuntu-latest
-            flags: --linux
     runs-on: ${{ matrix.os }}
     permissions:
       contents: write
