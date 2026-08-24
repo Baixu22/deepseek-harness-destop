@@ -46,7 +46,7 @@ const result = spawnSync(
     '--config.node-linker=hoisted',
     '--config.strict-dep-builds=false',
     '--filter',
-    '@luo-ross/dsh-desktop-backend',
+    '@baixu22/dsh-desktop-backend',
     'deploy',
     '--prod',
     output,

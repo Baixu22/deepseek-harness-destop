@@ -43,7 +43,7 @@ export function createUpdaterController({
   }
 
   const check = async ({ manual = false } = {}) => {
-    if (!app.isPackaged || platform !== 'win32') {
+    if (!app.isPackaged || (platform !== 'win32' && platform !== 'darwin')) {
       if (manual) {
         await showManualResult({
           type: 'info',
@@ -112,7 +112,7 @@ export function createUpdaterController({
   }
 
   const start = () => {
-    if (started || !app.isPackaged || platform !== 'win32') return
+    if (started || !app.isPackaged || (platform !== 'win32' && platform !== 'darwin')) return
     started = true
     updater.autoDownload = true
     updater.autoInstallOnAppQuit = false

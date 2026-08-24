@@ -685,3 +685,18 @@ select.input {
   font-size: 13px;
   overflow-wrap: anywhere;
 }
+
+/* ── themed dropdown (native select replacement) ───────────────────── */
+.dd { position: relative; max-width: 240px; }
+.ddTrigger { position: relative; width: 100%; min-height: 32px; display: flex; align-items: center; padding: 5px 12px; padding-right: 32px; border: 1px solid var(--dsw-alias-border-l2); border-radius: 8px; background: var(--dsw-alias-bg-layer-1); color: var(--dsw-alias-label-primary); font: inherit; font-size: 14px; line-height: 22px; cursor: pointer; text-align: left; }
+.ddTrigger:focus { outline: none; border-color: var(--dsw-alias-brand-primary); }
+.ddTrigger:disabled { opacity: 0.6; cursor: default; }
+.ddTrigger::after { content: ""; position: absolute; right: 12px; top: 50%; width: 12px; height: 12px; transform: translateY(-50%); background: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='12' height='12' viewBox='0 0 12 12' fill='none'%3E%3Cpath d='M3 4.5L6 7.5L9 4.5' stroke='%2381858C' stroke-width='1.5' stroke-linecap='round' stroke-linejoin='round'/%3E%3C/svg%3E") no-repeat center / 12px 12px; transition: transform .12s ease; }
+.ddTrigger[data-open="true"]::after { transform: translateY(-50%) rotate(180deg); }
+.ddSummary { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.ddEmpty { color: var(--dsw-alias-label-tertiary, var(--dsw-alias-label-secondary)); }
+.ddPanel { position: absolute; z-index: 60; top: calc(100% + 4px); left: 0; min-width: 100%; max-height: 264px; overflow: auto; background: var(--dsw-alias-button-floating-fill); border: 1px solid var(--dsw-alias-border-l2); border-radius: 10px; padding: 4px; box-shadow: var(--dsw-shadow-lv2, 0 8px 24px rgba(0, 0, 0, .35)); }
+.ddOption { display: flex; align-items: center; gap: 8px; width: 100%; padding: 6px 8px; border: 0; border-radius: 6px; background: none; color: var(--dsw-alias-label-primary); font: inherit; font-size: 13px; line-height: 20px; cursor: pointer; text-align: left; white-space: nowrap; }
+.ddOption:hover { background: var(--dsw-alias-button-floating-hover); }
+.ddCheck { width: 14px; height: 14px; border-radius: 4px; border: 1px solid var(--dsw-alias-border-l3, rgba(129, 133, 140, .5)); display: inline-flex; align-items: center; justify-content: center; color: transparent; flex: none; }
+.ddOption[aria-selected="true"] .ddCheck { background: var(--dsw-alias-button-info-fill, #4176e6); border-color: transparent; color: var(--dsw-static-neutral-00, #fff); }

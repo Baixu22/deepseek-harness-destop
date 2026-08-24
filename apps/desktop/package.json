@@ -1,20 +1,20 @@
 {
-  "name": "@luo-ross/dsh-desktop",
+  "name": "@baixu22/dsh-desktop",
   "productName": "DSH",
   "version": "0.1.19",
   "description": "Unofficial community desktop edition of DeepSeek Harness",
   "author": {
-    "name": "luo-ross",
-    "url": "https://github.com/luo-ross"
+    "name": "Baixu22",
+    "url": "https://github.com/Baixu22/deepseek-harness-destop"
   },
-  "homepage": "https://github.com/luo-ross/dsh-desktop#readme",
+  "homepage": "https://github.com/Baixu22/deepseek-harness-destop#readme",
   "repository": {
     "type": "git",
-    "url": "git+https://github.com/luo-ross/dsh-desktop.git",
+    "url": "git+https://github.com/Baixu22/deepseek-harness-destop.git",
     "directory": "apps/desktop"
   },
   "bugs": {
-    "url": "https://github.com/luo-ross/dsh-desktop/issues"
+    "url": "https://github.com/Baixu22/deepseek-harness-destop/issues"
   },
   "type": "module",
   "main": "main.mjs",
@@ -29,14 +29,18 @@
   "scripts": {
     "start": "electron .",
     "stage-backend": "node scripts/stage-backend.mjs",
-    "package": "pnpm run stage-backend && electron-builder --win nsis"
+    "package": "pnpm run stage-backend && electron-builder --win nsis",
+    "package:win": "pnpm run stage-backend && electron-builder --win",
+    "package:mac": "pnpm run stage-backend && electron-builder --mac",
+    "package:linux": "pnpm run stage-backend && electron-builder --linux",
+    "package:all": "pnpm run stage-backend && electron-builder -mwl"
   },
   "devDependencies": {
     "electron": "43.4.0",
     "electron-builder": "26.15.3"
   },
   "build": {
-    "appId": "io.github.luoross.dshdesktop",
+    "appId": "io.github.baixu22.dshdesktop",
     "productName": "DSH",
     "asar": true,
     "npmRebuild": false,
@@ -79,10 +83,28 @@
       ],
       "artifactName": "DSH-Windows-x64-Setup-${version}.${ext}"
     },
+    "mac": {
+      "icon": "build/icon.png",
+      "category": "public.app-category.productivity",
+      "target": [
+        { "target": "dmg", "arch": ["x64", "arm64"] },
+        { "target": "zip", "arch": ["x64", "arm64"] }
+      ],
+      "artifactName": "DSH-macOS-${arch}-${version}.${ext}"
+    },
+    "linux": {
+      "icon": "build/icon.png",
+      "category": "Utility",
+      "target": [
+        { "target": "AppImage", "arch": ["x64"] },
+        { "target": "deb", "arch": ["x64"] }
+      ],
+      "artifactName": "DSH-Linux-x64-${version}.${ext}"
+    },
     "publish": {
       "provider": "github",
-      "owner": "luo-ross",
-      "repo": "dsh-desktop"
+      "owner": "Baixu22",
+      "repo": "deepseek-harness-destop"
     },
     "nsis": {
       "installerIcon": "build/icon.ico",

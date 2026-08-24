@@ -21,7 +21,7 @@
  * levels instead.
  */
 
-import { useState } from 'react'
+import { useEffect, useRef, useState } from 'react'
 import type { ReactNode } from 'react'
 import type { IApiClient } from '@deepseek-ai/dsh-api-remotes/client'
 import { apiKeyFailure } from './apiKey.ts'
@@ -32,6 +32,86 @@ import type { ModelDraft } from './ModelListEditor.tsx'
 import { deriveKeyRef, messageOf } from './store.ts'
 import type { en } from './locales.ts'
 import styles from './ModelsSection.module.css'
+
+/** One choice of a {@link Dropdown}. */
+interface DropdownOption {
+  value: string
+  label: string
+}
+
+/**
+ * Themed replacement for the native select: the OS widget cannot match the
+ * app's menu language, and a multi-select does not exist at all. Single mode
+ * closes on pick; multi mode keeps the panel open and ticks boxes.
+ */
+export function Dropdown(props: {
+  options: readonly DropdownOption[]
+  selected: readonly string[]
+  multi?: boolean
+  disabled?: boolean
+  ariaLabel: string
+  placeholder?: string
+  onChange: (next: string[]) => void
+}): ReactNode {
+  const [open, setOpen] = useState(false)
+  const rootRef = useRef<HTMLDivElement | null>(null)
+  useEffect(() => {
+    if (!open) return
+    const onDown = (event: PointerEvent): void => {
+      if (rootRef.current !== null && event.target instanceof Node && !rootRef.current.contains(event.target)) setOpen(false)
+    }
+    document.addEventListener('pointerdown', onDown)
+    return () => document.removeEventListener('pointerdown', onDown)
+  }, [open])
+  const labels = props.selected
+    .map(value => props.options.find(option => option.value === value)?.label ?? value)
+  const summary = labels.length > 0 ? labels.join(', ') : (props.placeholder ?? '')
+  return (
+    <div ref={rootRef} className={styles['dd']}>
+      <button
+        type="button"
+        className={styles['ddTrigger']}
+        data-open={open ? 'true' : undefined}
+        disabled={props.disabled}
+        aria-haspopup="listbox"
+        aria-expanded={open}
+        aria-label={props.ariaLabel}
+        onClick={() => setOpen(value => !value)}
+      >
+        <span className={summary === '' ? styles['ddSummary'] + ' ' + styles['ddEmpty'] : styles['ddSummary']}>{summary}</span>
+      </button>
+      {open
+        ? (
+          <div className={styles['ddPanel']} role="listbox" aria-label={props.ariaLabel}>
+            {props.options.map(option => {
+              const on = props.selected.includes(option.value)
+              return (
+                <button
+                  key={option.value}
+                  type="button"
+                  role="option"
+                  aria-selected={on}
+                  className={styles['ddOption']}
+                  onClick={() => {
+                    if (props.multi) {
+                      props.onChange(on ? props.selected.filter(v => v !== option.value) : [...props.selected, option.value])
+                    } else {
+                      props.onChange([option.value])
+                      setOpen(false)
+                    }
+                  }}
+                >
+                  <span className={styles['ddCheck']} aria-hidden="true"><svg width="10" height="10" viewBox="0 0 12 12" fill="none"><path d="M2.5 6.2 5 8.7 9.5 3.8" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" /></svg></span>
+                  <span>{option.label}</span>
+                </button>
+              )
+            })}
+          </div>
+        )
+        : null}
+    </div>
+  )
+}
 
 /** The settings namespace a hand-declared provider is written into. */
 const NS = 'llm-pi-ai'
@@ -45,6 +125,15 @@ const NS = 'llm-pi-ai'
  * credential seam with a raw regular expression the user cannot act on.
  */
 const ROUTE_PATTERN = /^[a-z][a-z0-9]*(?:-[a-z0-9]+)*$/
+
+/** Common reasoning-effort levels a hand-declared provider may offer. */
+const COMMON_EFFORTS: readonly { value: string; label: string }[] = [
+  { value: 'low', label: 'Low' },
+  { value: 'medium', label: 'Medium' },
+  { value: 'high', label: 'High' },
+  { value: 'xhigh', label: 'XHigh' },
+  { value: 'max', label: 'Max' },
+]
 
 /** Props of {@link CustomProviderCard}. */
 export interface CustomProviderCardProps {
@@ -82,6 +171,8 @@ export function CustomProviderCard(props: CustomProviderCardProps): ReactNode {
   const [displayName, setDisplayName] = useState('')
   const [baseURL, setBaseURL] = useState('')
   const [protocol, setProtocol] = useState(protocols[0] ?? '')
+  /** Effort levels the declared models will offer; empty inherits defaults. */
+  const [efforts, setEfforts] = useState<readonly string[]>([])
   const [keyDraft, setKeyDraft] = useState('')
   const [models, setModels] = useState<readonly ModelDraft[]>([])
   const [busy, setBusy] = useState(false)
@@ -142,7 +233,14 @@ export function CustomProviderCard(props: CustomProviderCardProps): ReactNode {
         ...storesKey ? { apiKeyEnv: keyRef } : {},
         api: protocol,
         baseURL,
-        models: models.map(model => ({ ...model })),
+        models: models.map(model => ({
+          ...model,
+          // The declared levels reach the composer's effort menu through the
+          // catalog's per-model reasoningEfforts; off is always offered.
+          ...(efforts.length > 0
+            ? { reasoningEfforts: { off: null, ...Object.fromEntries(efforts.map(level => [level, level])) } }
+            : {}),
+        })),
       }
       const response = await api.settings.mutate({
         ns: NS,
@@ -235,15 +333,27 @@ export function CustomProviderCard(props: CustomProviderCardProps): ReactNode {
       </div>
       <div className={styles['field']}>
         <span className={styles['fieldLabel']}>{t('customApi')}</span>
-        <select
-          className={`${styles['input']} ${styles['selectInput']}`}
-          value={protocol}
-          aria-label={t('customApi')}
+        <Dropdown
+          options={protocols.map(choice => ({ value: choice, label: choice }))}
+          selected={protocol === '' ? [] : [protocol]}
+          placeholder={t('customApiUnset')}
+          ariaLabel={t('customApi')}
           disabled={profileDisabled}
-          onChange={(event) => { setProtocol(event.target.value) }}
-        >
-          {protocols.map(choice => <option key={choice} value={choice}>{choice}</option>)}
-        </select>
+          onChange={next => setProtocol(next[0] ?? '')}
+        />
+      </div>
+      <div className={styles['field']}>
+        <span className={styles['fieldLabel']}>{t('customEfforts')}</span>
+        <Dropdown
+          multi
+          options={COMMON_EFFORTS}
+          selected={efforts}
+          placeholder={t('customEffortsDefault')}
+          ariaLabel={t('customEfforts')}
+          disabled={profileDisabled}
+          onChange={next => setEfforts(next)}
+        />
+        <p className={styles['advancedHint']}>{t('customEffortsHint')}</p>
       </div>
       <div className={styles['field']}>
         <span className={styles['fieldLabel']}>{t('keyInput')}</span>

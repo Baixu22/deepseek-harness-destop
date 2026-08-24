@@ -4,7 +4,7 @@
 // ConversationRoot so the textarea survives the hero → composer flip); CSS
 // positions it over this shell's glow area during the hero phase.
 
-import { useId } from 'react'
+import { useEffect, useId, useRef } from 'react'
 import type { ReactNode, RefObject } from 'react'
 import {
   FishLogo, IconChevronDownOutline14, IconFolderClose16, IconFolderOpen16,
@@ -114,9 +114,65 @@ export interface HeroShellProps {
  * @param props - see {@link HeroShellProps}.
  * @returns the centered hero element tree.
  */
+/**
+ * The official cursor blend ring: a fixed white disc under mix-blend
+ * difference that eases after the pointer and swells over
+ * [data-cursor="blend"] targets (the headline), inverting their ink exactly
+ * like deepseek.com. Ported from the desktop welcome page
+ * (apps/desktop/hero-background.js initCursor).
+ * @returns the ring element (hero-only; unmounts with the hero phase).
+ */
+export function CursorBlendRing(): ReactNode {
+  const ref = useRef<HTMLDivElement | null>(null)
+  useEffect(() => {
+    const ring = ref.current
+    if (ring === null) return
+    if (window.matchMedia('(hover: none), (pointer: coarse)').matches) return
+    let targetX = 0
+    let targetY = 0
+    let x = 0
+    let y = 0
+    let visible = false
+    let raf = 0
+    const onMove = (event: MouseEvent): void => {
+      targetX = event.clientX
+      targetY = event.clientY
+      if (!visible) {
+        visible = true
+        ring.style.opacity = '1'
+        x = targetX
+        y = targetY
+      }
+      const blend = event.target instanceof Element ? event.target.closest('[data-cursor="blend"]') : null
+      ring.classList.toggle(css.cursorRingBlend, blend !== null)
+    }
+    const onLeave = (): void => {
+      visible = false
+      ring.style.opacity = '0'
+    }
+    const follow = (): void => {
+      const ease = Math.hypot(targetX - x, targetY - y) < 50 ? 0.7 : 0.4
+      x += (targetX - x) * ease
+      y += (targetY - y) * ease
+      ring.style.transform = `translate3d(${x}px, ${y}px, 0)`
+      raf = window.requestAnimationFrame(follow)
+    }
+    window.addEventListener('mousemove', onMove)
+    document.addEventListener('mouseleave', onLeave)
+    raf = window.requestAnimationFrame(follow)
+    return () => {
+      window.removeEventListener('mousemove', onMove)
+      document.removeEventListener('mouseleave', onLeave)
+      window.cancelAnimationFrame(raf)
+    }
+  }, [])
+  return <div ref={ref} className={css.cursorRing} aria-hidden="true" />
+}
+
 export function HeroShell({ t, renderSlot, children }: HeroShellProps) {
   return (
     <div className={css.root}>
+      <CursorBlendRing />
       <div className={css.stack}>
         <div className={css.headline}>
           {/* figma 34:10412: fish 34×25 leading the headline, gap 10. */}
@@ -125,7 +181,7 @@ export function HeroShell({ t, renderSlot, children }: HeroShellProps) {
               fallback: <FishLogo size={34} className={css.fish} />,
             })}
           </span>
-          <span className={css.headlineText}>{t('hero.headline')}</span>
+          <span className={css.headlineText} data-cursor="blend">{t('hero.headline')}</span>
           <span className={css.previewBadge}>{t('hero.preview')}</span>
         </div>
         <div className={css.body}>

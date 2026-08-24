@@ -49,8 +49,8 @@ const repositoryUrl = 'git+https://github.com/deepseek-harness/deepseek-harness.
  */
 const publishedRepositoryUrl = 'git+https://github.com/deepseek-ai/deepseek-harness.git'
 const releaseRepositoryUrlOverrides = new Map([
-  ['@luo-ross/dsh-desktop', 'git+https://github.com/luo-ross/dsh-desktop.git'],
-  ['@luo-ross/dsh-desktop-backend', 'git+https://github.com/luo-ross/dsh-desktop.git'],
+  ['@baixu22/dsh-desktop', 'git+https://github.com/Baixu22/deepseek-harness-destop.git'],
+  ['@baixu22/dsh-desktop-backend', 'git+https://github.com/Baixu22/deepseek-harness-destop.git'],
 ])
 /** Private packages that participate in workspace checks but not releases. */
 const experimentalPackageDirectory = /^packages\/experimental\/[^/]+$/
@@ -422,7 +422,7 @@ function checkRepositoryVersion(): string[] {
 /** Dependency sections whose ranges reach a published tarball or a local install. */
 const dependencySections = ['dependencies', 'devDependencies', 'peerDependencies', 'optionalDependencies'] as const
 const publishedDeploymentDependencies = new Map([
-  ['@luo-ross/dsh-desktop-backend', new Map([
+  ['@baixu22/dsh-desktop-backend', new Map([
     ['@deepseek-ai/dsh', '0.1.1-rc.2'],
   ])],
 ])

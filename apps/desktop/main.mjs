@@ -417,7 +417,7 @@ async function installUpdateControl(window) {
     if (!document.getElementById('dsh-desktop-repository')) {
       const repository = document.createElement('a');
       repository.id = 'dsh-desktop-repository';
-      repository.href = 'https://github.com/luo-ross/dsh-desktop';
+      repository.href = 'https://github.com/Baixu22/deepseek-harness-destop';
       repository.target = '_blank';
       repository.rel = 'noopener noreferrer';
       repository.textContent = 'GitHub 仓库';
