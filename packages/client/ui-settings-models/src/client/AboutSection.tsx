@@ -41,6 +41,8 @@ const REPOSITORY = 'https://github.com/Baixu22/deepseek-harness-destop'
  */
 export function AboutSection({ t }: AboutSectionProps): ReactNode {
   const bridge = (globalThis as { dshDesktop?: DesktopBridge }).dshDesktop
+  const checkForUpdates = bridge?.checkForUpdates
+  const installUpdate = bridge?.installUpdate
   const [state, setState] = useState<AboutUpdateState>({ status: 'idle' })
   useEffect(() => {
     if (bridge === undefined || bridge.getUpdateState === undefined) return
@@ -78,7 +80,7 @@ export function AboutSection({ t }: AboutSectionProps): ReactNode {
         <a className={styles['aboutLink']} href={REPOSITORY} target="_blank" rel="noopener noreferrer">{REPOSITORY.replace('https://', '')}</a>
         <p className={styles['advancedHint']}>{t('aboutRepoHint')}</p>
       </div>
-      {bridge?.checkForUpdates !== undefined
+      {checkForUpdates !== undefined
         ? (
           <div className={styles['field']}>
             <span className={styles['fieldLabel']}>{t('aboutCheck')}</span>
@@ -87,8 +89,8 @@ export function AboutSection({ t }: AboutSectionProps): ReactNode {
               className={styles['aboutCheckBtn']}
               disabled={state.status === 'checking' || state.status === 'installing'}
               onClick={() => {
-                if (state.status === 'downloaded' && bridge.installUpdate !== undefined) void bridge.installUpdate()
-                else void bridge.checkForUpdates()
+                if (state.status === 'downloaded' && installUpdate !== undefined) void installUpdate()
+                else void checkForUpdates()
               }}
             >
               {statusLabel()}
