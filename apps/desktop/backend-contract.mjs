@@ -10,6 +10,6 @@ export const BACKEND_RUNTIME_PATHS = [
  * @param {string} entry - Absolute path to the packaged dsh CLI entry.
  * @returns {string[]} Electron Node-mode arguments for the loopback Web host.
  */
-export function backendLaunchArguments(entry) {
-  return ['--expose-internals', entry, 'web', '--host', '127.0.0.1', '--port', '0', '--no-open']
+export function backendLaunchArguments(entry, extra = []) {
+  return ['--expose-internals', ...extra, entry, 'web', '--host', '127.0.0.1', '--port', '0', '--no-open']
 }

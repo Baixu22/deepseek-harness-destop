@@ -171,16 +171,21 @@ async function waitForBackendHttp(url) {
 }
 
 function startBackend() {
-  const entry = backendEntryPath()
+  // Dev runs the backend from source (tsx) exactly like `dsh web` dev, so
+  // plugin host externals resolve against the monorepo workspace; the built
+  // bin.js would resolve them through node from the plugin path and can hit
+  // an unrelated user-level install.
+  const dev = !app.isPackaged
+  const entry = dev ? join(app.getAppPath(), '..', 'cli', 'src', 'bin.ts') : backendEntryPath()
   if (!existsSync(entry)) {
     throw new Error(`DeepSeek Harness backend is missing: ${entry}`)
   }
 
   const child = spawn(
     process.execPath,
-    backendLaunchArguments(entry),
+    backendLaunchArguments(entry, dev ? ['--import', 'tsx/esm'] : []),
     {
-      cwd: app.getPath('documents'),
+      cwd: dev ? join(app.getAppPath(), '..', '..') : app.getPath('documents'),
       env: { ...process.env, ELECTRON_RUN_AS_NODE: '1' },
       stdio: ['ignore', 'pipe', 'pipe'],
       windowsHide: true,
