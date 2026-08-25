@@ -9,13 +9,6 @@
   height: 100%;
   min-width: 0;
   padding: 0 24px;
-  /* The cursor blend ring (mix-blend difference) needs an opaque backdrop
-     to invert against: the hero surface is otherwise transparent, so in the
-     light theme the white disc painted raw and ate the headline. The same
-     token the conversation surface uses keeps pixels identical while giving
-     the blend a real backdrop in both themes. */
-  background: var(--dsw-alias-bg-base);
-  isolation: isolate;
 }
 
 /* Cap matches the InputBar card. Glow may paint past the sides. */
@@ -226,7 +219,7 @@
   opacity: 0;
   width: 0;
   height: 0;
-  mix-blend-mode: difference;
+  overflow: hidden;
   transition: width .3s cubic-bezier(.16, 1, .3, 1), height .3s cubic-bezier(.16, 1, .3, 1), margin .3s cubic-bezier(.16, 1, .3, 1), background-color .3s, border-color .3s, opacity .3s;
 }
 
@@ -236,8 +229,33 @@
   margin-left: -32px;
   margin-top: -32px;
   border-color: transparent;
-  background: #ffffff;
-  mix-blend-mode: difference;
+  background: var(--dsh-hero-ring);
+}
+
+/* The knocked-out headline clone inside the disc: same type as the hero
+   headline, inverse ink, counter-translated so it pins over the original. */
+.cursorRingText {
+  position: absolute;
+  left: 0;
+  top: 0;
+  font-size: 26px;
+  line-height: 32px;
+  font-weight: 500;
+  white-space: nowrap;
+  color: var(--dsh-hero-ring-ink);
+  will-change: transform;
+}
+
+/* Lens palette per theme: light gets the ink disc with white knockout,
+   dark the official white disc with black knockout. */
+body[data-ds-dark-theme] {
+  --dsh-hero-ring: #ffffff;
+  --dsh-hero-ring-ink: #17181a;
+}
+
+body:not([data-ds-dark-theme]) {
+  --dsh-hero-ring: #17181a;
+  --dsh-hero-ring-ink: #ffffff;
 }
 
 @media (hover: none), (pointer: coarse) {
@@ -245,7 +263,3 @@
     display: none;
   }
 }
-
-/* Light theme keeps the official blend-ring hover: difference inverts the
-   light surface into an ink-dark lens with the headline knocked out to
-   white - the same inversion the dark theme renders as a white disc. */

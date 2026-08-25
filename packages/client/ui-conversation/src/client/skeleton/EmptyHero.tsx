@@ -124,9 +124,11 @@ export interface HeroShellProps {
  */
 export function CursorBlendRing(): ReactNode {
   const ref = useRef<HTMLDivElement | null>(null)
+  const copyRef = useRef<HTMLSpanElement | null>(null)
   useEffect(() => {
     const ring = ref.current
-    if (ring === null) return
+    const copy = copyRef.current
+    if (ring === null || copy === null) return
     if (window.matchMedia('(hover: none), (pointer: coarse)').matches) return
     let targetX = 0
     let targetY = 0
@@ -134,6 +136,19 @@ export function CursorBlendRing(): ReactNode {
     let y = 0
     let visible = false
     let raf = 0
+    // The knocked-out headline clone rides inside the disc; its offset is
+    // re-derived whenever the source text can move (resize, locale, font).
+    let origLeft = 0
+    let origTop = 0
+    const measure = (): void => {
+      const src = document.querySelector('[data-cursor="blend"]')
+      if (!(src instanceof HTMLElement)) return
+      if (copy.textContent !== src.textContent) copy.textContent = src.textContent
+      const r = src.getBoundingClientRect()
+      origLeft = r.left
+      origTop = r.top
+    }
+    measure()
     const onMove = (event: MouseEvent): void => {
       targetX = event.clientX
       targetY = event.clientY
@@ -142,6 +157,7 @@ export function CursorBlendRing(): ReactNode {
         ring.style.opacity = '1'
         x = targetX
         y = targetY
+        measure()
       }
       const blend = event.target instanceof Element ? event.target.closest('[data-cursor="blend"]') : null
       ring.classList.toggle(css.cursorRingBlend ?? 'dsh-cursor-blend', blend !== null)
@@ -155,20 +171,28 @@ export function CursorBlendRing(): ReactNode {
       x += (targetX - x) * ease
       y += (targetY - y) * ease
       ring.style.transform = `translate3d(${x}px, ${y}px, 0)`
+      // Counter-translate the clone so the glyphs stay pinned over their
+      // originals while the disc eases under the pointer (32 = half disc).
+      copy.style.transform = `translate3d(${origLeft - x + 32}px, ${origTop - y + 32}px, 0)`
       raf = window.requestAnimationFrame(follow)
     }
     window.addEventListener('mousemove', onMove)
     document.addEventListener('mouseleave', onLeave)
+    window.addEventListener('resize', measure)
     raf = window.requestAnimationFrame(follow)
     return () => {
       window.removeEventListener('mousemove', onMove)
       document.removeEventListener('mouseleave', onLeave)
+      window.removeEventListener('resize', measure)
       window.cancelAnimationFrame(raf)
     }
   }, [])
-  return <div ref={ref} className={css.cursorRing} aria-hidden="true" />
+  return (
+    <div ref={ref} className={css.cursorRing} aria-hidden="true">
+      <span ref={copyRef} className={css.cursorRingText} />
+    </div>
+  )
 }
-
 export function HeroShell({ t, renderSlot, children }: HeroShellProps) {
   return (
     <div className={css.root}>
