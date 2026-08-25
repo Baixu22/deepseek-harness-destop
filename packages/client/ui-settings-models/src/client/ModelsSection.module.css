@@ -702,9 +702,21 @@ select.input {
 .ddOption[aria-selected="true"] .ddCheck { background: var(--dsw-alias-button-info-fill, #4176e6); border-color: transparent; color: var(--dsw-static-neutral-00, #fff); }
 
 /* About section (desktop edition). */
-.about { display: flex; flex-direction: column; gap: 14px; max-width: 480px; }
-.aboutLink { color: var(--dsw-alias-brand-primary-new-colorprimary-new-color, #4176e6); font-size: 13px; text-decoration: none; word-break: break-all; }
+/* About section: brand head plus a hairline row list in the panel language. */
+.about { display: flex; flex-direction: column; gap: 18px; max-width: 560px; color: var(--dsw-alias-label-primary); }
+.aboutHead { display: flex; align-items: center; gap: 12px; }
+.aboutLogo { flex: none; color: var(--dsw-alias-label-primary); }
+.aboutId { display: flex; flex-direction: column; gap: 2px; min-width: 0; }
+.aboutName { font-size: 16px; line-height: 24px; font-weight: 500; }
+.aboutTag { font-size: 12px; line-height: 18px; color: var(--dsw-alias-label-tertiary); }
+.aboutPill { margin-left: auto; flex: none; padding: 1px 10px; border: 1px solid var(--dsw-alias-border-l2); border-radius: 24px; background: var(--dsw-alias-fill-tsp-secondary); color: var(--dsw-alias-label-secondary); font-family: var(--ds-font-family-code); font-size: 12px; line-height: 20px; }
+.aboutRows { display: flex; flex-direction: column; border-top: 1px solid var(--dsw-alias-border-l2); }
+.aboutRow { display: flex; align-items: center; justify-content: space-between; gap: 16px; padding: 12px 2px; border-bottom: 1px solid var(--dsw-alias-border-l2); }
+.aboutKey { flex: none; font-size: 13px; line-height: 20px; color: var(--dsw-alias-label-tertiary); }
+.aboutValue { min-width: 0; font-size: 13px; line-height: 20px; color: var(--dsw-alias-label-primary); text-align: right; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.aboutLink { color: var(--dsw-alias-label-primary-bluish); font-size: 13px; line-height: 20px; text-decoration: none; word-break: break-all; }
 .aboutLink:hover { text-decoration: underline; }
-.aboutCheckBtn { align-self: flex-start; padding: 4px 12px; border: 1px solid var(--dsw-alias-border-l2); border-radius: 8px; background: var(--dsw-alias-bg-layer-1); color: var(--dsw-alias-label-primary); font: inherit; font-size: 13px; cursor: pointer; }
+.aboutCheckBtn { min-width: 108px; height: 28px; padding: 0 14px; border: none; border-radius: 14px; background: var(--dsw-alias-interactive-bg-hover); color: var(--dsw-alias-label-primary); font: inherit; font-size: 12px; line-height: 20px; font-weight: 500; cursor: pointer; }
 .aboutCheckBtn:hover { background: var(--dsw-alias-button-floating-hover); }
 .aboutCheckBtn:disabled { opacity: .6; cursor: default; }
+.aboutFoot { margin: 0; font-size: 12px; line-height: 18px; color: var(--dsw-alias-label-caption); }

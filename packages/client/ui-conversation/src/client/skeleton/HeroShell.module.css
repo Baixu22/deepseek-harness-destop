@@ -238,3 +238,7 @@
     display: none;
   }
 }
+
+/* Light theme keeps the official blend-ring hover: difference inverts the
+   light surface into an ink-dark lens with the headline knocked out to
+   white - the same inversion the dark theme renders as a white disc. */

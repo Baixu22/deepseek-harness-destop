@@ -11,7 +11,7 @@
 import { useEffect } from 'react'
 import type { SnapshotStore } from '@deepseek-ai/dsh-client-runtime/client'
 import type { InjectFace, PropsLocale, PropsRuntime } from '@deepseek-ai/dsh-client-ui-slots'
-import { IconAgentPresetOutline16 } from '@deepseek-ai/dsh-client-ui-primitives'
+import { IconAgentPresetOutline16, Tooltip } from '@deepseek-ai/dsh-client-ui-primitives'
 // Type-only: pulls the ui-conversation SlotMap merge (the header actions).
 import type {} from '@deepseek-ai/dsh-client-ui-conversation/client'
 import type { AgentPresetSettingsState } from './settings-store.ts'
@@ -55,10 +55,16 @@ export function AgentPresetLabel({
 
   const option = options.find(entry => entry.id === preset)
   const text = option === undefined ? undefined : presetDisplayText(option, t)
+  // App-styled bubble (name over description) instead of the OS title
+  // tooltip: instant, theme-consistent, same language as every other hover
+  // label in the app.
+  const tip = text === undefined ? t('headerHint') : text.name + '\n' + text.description
   return (
-    <span className={css.label} title={text?.description ?? t('headerHint')}>
-      <IconAgentPresetOutline16 size={14} className={css.icon} />
-      {text?.name ?? preset}
-    </span>
+    <Tooltip label={tip} side="bottom" delayMs={120}>
+      <span className={css.label}>
+        <IconAgentPresetOutline16 size={14} className={css.icon} />
+        {text?.name ?? preset}
+      </span>
+    </Tooltip>
   )
 }

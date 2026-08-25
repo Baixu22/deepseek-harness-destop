@@ -1,12 +1,14 @@
 /**
- * The desktop edition's About page: version lineage, project home, and the
- * Electron updater's check/install surface. Rendered as a settings section
- * so the desktop shell no longer needs its own top-bar buttons; in a plain
- * browser (no dshDesktop bridge) the update row simply stays hidden.
+ * The desktop edition's About page: brand head, version lineage, project
+ * home, and the Electron updater surface, composed in the settings panel's
+ * row language (13/20 rows on border-l2 hairlines, capsule action) so it
+ * reads as a first-class section. In a plain browser (no dshDesktop bridge)
+ * the runtime and update rows simply stay hidden.
  */
 
 import { useEffect, useState } from 'react'
 import type { ReactNode } from 'react'
+import { FishLogo } from '@deepseek-ai/dsh-client-ui-primitives'
 import styles from './ModelsSection.module.css'
 
 /** The subset of the Electron preload bridge this page reads. */
@@ -26,10 +28,17 @@ interface AboutUpdateState {
   message?: string
 }
 
+/** Copy seat for the About section. */
+export type AboutKey =
+  | 'aboutNav' | 'aboutTagline' | 'aboutVersion' | 'aboutRuntime'
+  | 'aboutRepo' | 'aboutCheckNow' | 'aboutChecking' | 'aboutUpToDate'
+  | 'aboutDownloading' | 'aboutInstall' | 'aboutInstalling' | 'aboutError'
+  | 'aboutFoot'
+
 /** Props of {@link AboutSection}. */
 export interface AboutSectionProps {
   /** Bound translate of the models namespace (shares its copy seats). */
-  t: (key: 'aboutNav' | 'aboutVersion' | 'aboutRuntime' | 'aboutRepo' | 'aboutRepoHint' | 'aboutCheck') => string
+  t: (key: AboutKey) => string
 }
 
 const REPOSITORY = 'https://github.com/Baixu22/deepseek-harness-destop'
@@ -50,55 +59,68 @@ export function AboutSection({ t }: AboutSectionProps): ReactNode {
     if (bridge.onUpdateState === undefined) return
     return bridge.onUpdateState(next => setState(next))
   }, [bridge])
+
   const statusLabel = (): string => {
     switch (state.status) {
-      case 'checking': return '…'
-      case 'up-to-date': return '✓'
-      case 'downloading': return state.percent && state.percent > 0 ? String(state.percent) + '%' : '…'
-      case 'downloaded': return '⬇'
-      case 'installing': return '…'
-      case 'error': return '!'
-      default: return ''
+      case 'checking': return t('aboutChecking')
+      case 'up-to-date': return t('aboutUpToDate')
+      case 'downloading': return state.percent && state.percent > 0
+        ? t('aboutDownloading') + ' ' + String(Math.round(state.percent)) + '%'
+        : t('aboutDownloading')
+      case 'downloaded': return t('aboutInstall')
+      case 'installing': return t('aboutInstalling')
+      case 'error': return t('aboutError')
+      default: return t('aboutCheckNow')
     }
   }
+
   return (
     <div className={styles['about']}>
-      <h2 className={styles['title']}>{t('aboutNav')}</h2>
-      <div className={styles['field']}>
-        <span className={styles['fieldLabel']}>{t('aboutVersion')}</span>
-        <p className={styles['advancedHint']}>DSH {state.currentVersion ?? '—'}</p>
+      <div className={styles['aboutHead']}>
+        <FishLogo size={40} className={styles['aboutLogo']} />
+        <div className={styles['aboutId']}>
+          <span className={styles['aboutName']}>DeepSeek Harness Desktop</span>
+          <span className={styles['aboutTag']}>{t('aboutTagline')}</span>
+        </div>
+        <span className={styles['aboutPill']}>v{state.currentVersion ?? '…'}</span>
       </div>
-      {bridge?.versions !== undefined
-        ? (
-          <div className={styles['field']}>
-            <span className={styles['fieldLabel']}>{t('aboutRuntime')}</span>
-            <p className={styles['advancedHint']}>Electron {bridge.versions.electron ?? '—'} · Chrome {bridge.versions.chrome ?? '—'}</p>
-          </div>
-        )
-        : null}
-      <div className={styles['field']}>
-        <span className={styles['fieldLabel']}>{t('aboutRepo')}</span>
-        <a className={styles['aboutLink']} href={REPOSITORY} target="_blank" rel="noopener noreferrer">{REPOSITORY.replace('https://', '')}</a>
-        <p className={styles['advancedHint']}>{t('aboutRepoHint')}</p>
+      <div className={styles['aboutRows']}>
+        <div className={styles['aboutRow']}>
+          <span className={styles['aboutKey']}>{t('aboutVersion')}</span>
+          <span className={styles['aboutValue']}>DSH {state.currentVersion ?? '—'}</span>
+        </div>
+        {bridge?.versions !== undefined
+          ? (
+            <div className={styles['aboutRow']}>
+              <span className={styles['aboutKey']}>{t('aboutRuntime')}</span>
+              <span className={styles['aboutValue']}>Electron {bridge.versions.electron ?? '—'} · Chrome {bridge.versions.chrome ?? '—'}</span>
+            </div>
+          )
+          : null}
+        <div className={styles['aboutRow']}>
+          <span className={styles['aboutKey']}>{t('aboutRepo')}</span>
+          <a className={styles['aboutLink']} href={REPOSITORY} target="_blank" rel="noopener noreferrer">{REPOSITORY.replace('https://', '')}</a>
+        </div>
+        {checkForUpdates !== undefined
+          ? (
+            <div className={styles['aboutRow']}>
+              <span className={styles['aboutKey']}>{t('aboutCheckNow')}</span>
+              <button
+                type="button"
+                className={styles['aboutCheckBtn']}
+                disabled={state.status === 'checking' || state.status === 'installing'}
+                onClick={() => {
+                  if (state.status === 'downloaded' && installUpdate !== undefined) void installUpdate()
+                  else void checkForUpdates()
+                }}
+              >
+                {statusLabel()}
+              </button>
+            </div>
+          )
+          : null}
       </div>
-      {checkForUpdates !== undefined
-        ? (
-          <div className={styles['field']}>
-            <span className={styles['fieldLabel']}>{t('aboutCheck')}</span>
-            <button
-              type="button"
-              className={styles['aboutCheckBtn']}
-              disabled={state.status === 'checking' || state.status === 'installing'}
-              onClick={() => {
-                if (state.status === 'downloaded' && installUpdate !== undefined) void installUpdate()
-                else void checkForUpdates()
-              }}
-            >
-              {statusLabel()}
-            </button>
-          </div>
-        )
-        : null}
+      <p className={styles['aboutFoot']}>{t('aboutFoot')}</p>
     </div>
   )
 }
