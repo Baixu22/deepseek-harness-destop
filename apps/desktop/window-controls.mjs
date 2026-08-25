@@ -19,13 +19,19 @@ export const WINDOW_CONTROLS_CSS = `
   border: 0;
   border-radius: 0;
   background: transparent;
-  color: #34383d;
+  color: var(--dsw-alias-label-secondary, #81858c);
   font: 10px/1 "Segoe MDL2 Assets", "Segoe Fluent Icons", sans-serif;
-  cursor: default;
+  cursor: pointer;
+  transition: background-color .15s ease, color .15s ease;
 }
 
 #dsh-window-controls button:hover {
-  background: rgb(15 23 42 / 8%);
+  background: var(--dsw-alias-button-floating-hover, rgb(255 255 255 / 10%));
+  color: var(--dsw-alias-label-primary, #f9fafb);
+}
+
+#dsh-window-controls button:active {
+  background: var(--dsw-alias-button-tool-bar-hover, rgb(255 255 255 / 16%));
 }
 
 #dsh-window-controls button:focus-visible {

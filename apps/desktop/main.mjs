@@ -306,6 +306,12 @@ async function createWindow({ cachedBackend = false } = {}) {
     event.preventDefault()
     window.setTitle('DSH · DeepSeek Harness 桌面版')
   })
+  // Theme, injected CSS, and window controls live on the document, not the
+  // window: a reload wipes them, so re-apply on every dom-ready instead of
+  // only after the first backend load.
+  window.webContents.on('dom-ready', () => {
+    void applyDesktopTheme(window)
+  })
   const publishWindowState = () => {
     if (!window.isDestroyed()) {
       window.webContents.send('dsh-desktop:window-state', { maximized: window.isMaximized() })
@@ -404,68 +410,19 @@ async function installWindowControls(window) {
   }`)
 }
 
-async function installUpdateControl(window) {
-  await window.webContents.executeJavaScript(`{
-    const bridge = globalThis.dshDesktop;
-    let actions = document.getElementById('dsh-desktop-top-actions');
-    if (!actions) {
-      actions = document.createElement('div');
-      actions.id = 'dsh-desktop-top-actions';
-      actions.setAttribute('aria-label', 'DSH 快捷操作');
-      document.body.append(actions);
-    }
-    if (!document.getElementById('dsh-desktop-repository')) {
-      const repository = document.createElement('a');
-      repository.id = 'dsh-desktop-repository';
-      repository.href = 'https://github.com/Baixu22/deepseek-harness-destop';
-      repository.target = '_blank';
-      repository.rel = 'noopener noreferrer';
-      repository.textContent = 'GitHub 仓库';
-      repository.setAttribute('aria-label', '在浏览器中打开 DSH GitHub 仓库');
-      actions.append(repository);
-    }
-    if (bridge?.checkForUpdates && !document.getElementById('dsh-desktop-update')) {
-      const button = document.createElement('button');
-      button.id = 'dsh-desktop-update';
-      button.type = 'button';
-      button.setAttribute('aria-label', '检查 DSH 更新');
-      let status = 'idle';
-      const render = (state) => {
-        status = state.status;
-        const labels = {
-          idle: '检查更新',
-          checking: '正在检查…',
-          'up-to-date': '已是最新版',
-          downloading: state.percent > 0 ? '下载更新 ' + state.percent + '%' : '发现 v' + (state.version ?? ''),
-          downloaded: '立即更新 v' + (state.version ?? ''),
-          installing: '正在安装…',
-          error: '更新检查失败',
-        };
-        button.textContent = labels[state.status] ?? '检查更新';
-        button.dataset.status = state.status;
-        button.disabled = state.status === 'checking' || state.status === 'installing';
-        button.title = state.message ?? ('DSH ' + state.currentVersion);
-      };
-      button.addEventListener('click', () => {
-        if (status === 'downloaded') void bridge.installUpdate();
-        else void bridge.checkForUpdates();
-      });
-      actions.append(button);
-      void bridge.getUpdateState().then(render);
-      const unsubscribe = bridge.onUpdateState(render);
-      window.addEventListener('beforeunload', unsubscribe, { once: true });
-    }
-  }`)
-}
+
+let insertedThemeCssKeys = []
 
 async function applyDesktopTheme(window) {
   await window.webContents.executeJavaScript(
     "document.body.setAttribute('data-dsh-desktop-codex-theme', '')",
   )
-  await window.webContents.insertCSS(DESKTOP_THEME_CSS)
-  await window.webContents.insertCSS(WINDOW_CONTROLS_CSS)
+  for (const key of insertedThemeCssKeys.splice(0)) {
+    await window.webContents.removeInsertedCSS(key).catch(() => undefined)
+  }
+  insertedThemeCssKeys.push(await window.webContents.insertCSS(DESKTOP_THEME_CSS))
+  insertedThemeCssKeys.push(await window.webContents.insertCSS(WINDOW_CONTROLS_CSS))
   await installWindowControls(window)
-  await installUpdateControl(window)
 }
 
 const hasSingleInstanceLock = app.requestSingleInstanceLock()
@@ -491,7 +448,7 @@ if (!hasSingleInstanceLock) {
   app.on('window-all-closed', () => app.quit())
 
   app.whenReady().then(async () => {
-    if (process.platform === 'win32') app.setAppUserModelId('io.github.luoross.dshdesktop')
+    if (process.platform === 'win32') app.setAppUserModelId('io.github.baixu22.dshdesktop')
     Menu.setApplicationMenu(null)
     const cachedBackend = app.isPackaged
       && isPackagedBackendReady(packagedBackendDestination())
@@ -518,7 +475,6 @@ if (!hasSingleInstanceLock) {
       await waitForBackendHttp(backendUrl)
       if (!mainWindow.isDestroyed()) {
         await mainWindow.loadURL(backendUrl)
-        await applyDesktopTheme(mainWindow)
         updaterController.start()
       }
     } catch (error) {
