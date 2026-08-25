@@ -63,6 +63,7 @@ export function AboutSection({ t }: AboutSectionProps): ReactNode {
   }
   return (
     <div className={styles['about']}>
+      <h2 className={styles['title']}>{t('aboutNav')}</h2>
       <div className={styles['field']}>
         <span className={styles['fieldLabel']}>{t('aboutVersion')}</span>
         <p className={styles['advancedHint']}>DSH {state.currentVersion ?? '—'}</p>
