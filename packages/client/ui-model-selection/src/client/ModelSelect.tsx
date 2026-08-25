@@ -19,7 +19,7 @@ import clsx from 'clsx'
 import type { ModelReasoningEffort, ModelSelection } from '@deepseek-ai/dsh-api-remotes/client'
 import {
   IconCheckOutline16, IconChevronDownOutline14, IconChevronRightOutline14,
-  IconWarningOutline16, Toast,
+  IconWarningOutline16, Toast, Tooltip,
 } from '@deepseek-ai/dsh-client-ui-primitives'
 import type { PropsLocale } from '@deepseek-ai/dsh-client-ui-slots'
 import type { ModelSelectInjected } from './slots.ts'
@@ -218,28 +218,29 @@ export function ModelSelect(
 
   return (
     <div ref={rootRef} className={css.root} onKeyDown={onRootKeyDown} onBlur={onBlur}>
-      <button
-        ref={triggerRef}
-        type="button"
-        className={css.trigger}
-        aria-label={triggerAria}
-        aria-haspopup="menu"
-        aria-expanded={open}
-        aria-controls={open ? `${id}-menu` : undefined}
-        title={triggerLabel}
-        disabled={locked}
-        onClick={() => {
-          if (open) {
-            close()
-          } else {
-            show()
-          }
-        }}
-      >
-        <span className={css.triggerLabel}>{modelLabel}</span>
-        {effortLabel !== undefined && <span className={css.triggerEffort}>{effortLabel}</span>}
-        <IconChevronDownOutline14 className={clsx(css.chevron, open && css.chevronOpen)} />
-      </button>
+      <Tooltip label={() => `${triggerLabel}\n${t('trigger.tip')}`} side="top">
+        <button
+          ref={triggerRef}
+          type="button"
+          className={css.trigger}
+          aria-label={triggerAria}
+          aria-haspopup="menu"
+          aria-expanded={open}
+          aria-controls={open ? `${id}-menu` : undefined}
+          disabled={locked}
+          onClick={() => {
+            if (open) {
+              close()
+            } else {
+              show()
+            }
+          }}
+        >
+          <span className={css.triggerLabel}>{modelLabel}</span>
+          {effortLabel !== undefined && <span className={css.triggerEffort}>{effortLabel}</span>}
+          <IconChevronDownOutline14 className={clsx(css.chevron, open && css.chevronOpen)} />
+        </button>
+      </Tooltip>
 
       {open && (
         <div
