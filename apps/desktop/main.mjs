@@ -299,14 +299,7 @@ async function createWindow({ cachedBackend = false } = {}) {
   })
 
   window.webContents.setWindowOpenHandler(({ url: target }) => {
-    // Same-origin popups are plugin-owned standalone windows (the context
-    // viewer); everything else keeps the open-externally behavior.
-    if (target.startsWith('http://') || target.startsWith('https://')) {
-      if (backendUrl !== undefined && new URL(target).origin === new URL(backendUrl).origin) {
-        return { action: 'allow' }
-      }
-      void shell.openExternal(target)
-    }
+    if (target.startsWith('http://') || target.startsWith('https://')) void shell.openExternal(target)
     return { action: 'deny' }
   })
   window.webContents.on('will-navigate', (event, target) => {
