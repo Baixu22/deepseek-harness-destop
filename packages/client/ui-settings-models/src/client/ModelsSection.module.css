@@ -700,3 +700,11 @@ select.input {
 .ddOption:hover { background: var(--dsw-alias-button-floating-hover); }
 .ddCheck { width: 14px; height: 14px; border-radius: 4px; border: 1px solid var(--dsw-alias-border-l3, rgba(129, 133, 140, .5)); display: inline-flex; align-items: center; justify-content: center; color: transparent; flex: none; }
 .ddOption[aria-selected="true"] .ddCheck { background: var(--dsw-alias-button-info-fill, #4176e6); border-color: transparent; color: var(--dsw-static-neutral-00, #fff); }
+
+/* About section (desktop edition). */
+.about { display: flex; flex-direction: column; gap: 14px; max-width: 480px; }
+.aboutLink { color: var(--dsw-alias-brand-primary-new-colorprimary-new-color, #4176e6); font-size: 13px; text-decoration: none; word-break: break-all; }
+.aboutLink:hover { text-decoration: underline; }
+.aboutCheckBtn { align-self: flex-start; padding: 4px 12px; border: 1px solid var(--dsw-alias-border-l2); border-radius: 8px; background: var(--dsw-alias-bg-layer-1); color: var(--dsw-alias-label-primary); font: inherit; font-size: 13px; cursor: pointer; }
+.aboutCheckBtn:hover { background: var(--dsw-alias-button-floating-hover); }
+.aboutCheckBtn:disabled { opacity: .6; cursor: default; }
