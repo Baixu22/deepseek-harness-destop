@@ -9,7 +9,7 @@ DSH Desktop is a community desktop edition of [DeepSeek Harness](https://github.
 ## Highlights
 
 - **Electron packaging for three platforms** — Windows NSIS installer ships today; macOS (dmg/zip, x64 + arm64) and Linux (AppImage/deb) targets are wired into the `desktop-release` workflow.
-- **Automatic updates** — electron-updater feed on [GitHub Releases](https://github.com/luo-ross/dsh-desktop/releases/latest) with blockmap delta updates; in-app top actions provide a repository link and a manual "check for updates" control.
+- **Automatic updates** — electron-updater feed on [GitHub Releases](https://github.com/Baixu22/deepseek-harness-destop/releases/latest) with blockmap delta updates; in-app top actions provide a repository link and a manual "check for updates" control.
 - **Official-style hero landing** — ink-wash backdrop, interactive particle grid and the "探索未至之境" cursor-blend spotlight interaction, ported from deepseek.com.
 - **Theme-adaptive window icon** — the taskbar and shortcut icons follow the light/dark theme (black and white whale variants), applied through the app's AUMID.
 - **Reasoning-effort slider** — a GLSL blue-flame intensity slider docked in the composer; levels are probed at runtime from the model menu, never hardcoded.
@@ -18,7 +18,7 @@ DSH Desktop is a community desktop edition of [DeepSeek Harness](https://github.
 
 ## Install
 
-Grab the latest installer from [Releases](https://github.com/luo-ross/dsh-desktop/releases/latest).
+Grab the latest installer from [Releases](https://github.com/Baixu22/deepseek-harness-destop/releases/latest).
 
 | Platform | Artifact | Status |
 | --- | --- | --- |
@@ -33,7 +33,7 @@ The installer is not code-signed yet; Windows SmartScreen may warn — verify th
 Node.js 22.19+ and pnpm 11.7:
 
 ```sh
-git clone https://github.com/luo-ross/dsh-desktop.git
+git clone https://github.com/Baixu22/deepseek-harness-destop.git
 cd dsh-desktop
 pnpm install
 pnpm run build
@@ -51,4 +51,4 @@ Pushing a `v*` tag runs the three-platform release workflow and publishes instal
 
 ## Project home
 
-[github.com/luo-ross/dsh-desktop](https://github.com/luo-ross/dsh-desktop) — issues, releases and roadmap live here.
+[github.com/Baixu22/deepseek-harness-destop](https://github.com/Baixu22/deepseek-harness-destop) — issues, releases and roadmap live here.

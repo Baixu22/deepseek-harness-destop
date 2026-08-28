@@ -9,7 +9,7 @@ DSH Desktop 是 [DeepSeek Harness](https://github.com/deepseek-ai/deepseek-harne
 ## 特色
 
 - **三平台 Electron 封装** — Windows NSIS 安装包已发布；macOS（dmg/zip，x64 + arm64）与 Linux（AppImage/deb）目标已接入 `desktop-release` 流水线。
-- **自动更新** — 基于 [GitHub Releases](https://github.com/luo-ross/dsh-desktop/releases/latest) 的 electron-updater 更新源，支持 blockmap 增量更新；应用内顶部动作区提供仓库链接与手动「检查更新」。
+- **自动更新** — 基于 [GitHub Releases](https://github.com/Baixu22/deepseek-harness-destop/releases/latest) 的 electron-updater 更新源，支持 blockmap 增量更新；应用内顶部动作区提供仓库链接与手动「检查更新」。
 - **官网同款启动页** — 水墨背景、可交互粒子网格、"探索未至之境" 光标 blend 聚光交互，均从 deepseek.com 移植。
 - **主题自适应窗口图标** — 任务栏与快捷方式图标跟随亮/暗主题（黑白鲸鱼双版本），通过应用 AUMID 生效。
 - **推理强度滑块** — 停靠于 composer 的 GLSL 蓝色火焰强度滑块；档位运行时从模型菜单探测，不硬编码。
@@ -18,7 +18,7 @@ DSH Desktop 是 [DeepSeek Harness](https://github.com/deepseek-ai/deepseek-harne
 
 ## 安装
 
-前往 [Releases](https://github.com/luo-ross/dsh-desktop/releases/latest) 下载最新安装包。
+前往 [Releases](https://github.com/Baixu22/deepseek-harness-destop/releases/latest) 下载最新安装包。
 
 | 平台 | 产物 | 状态 |
 | --- | --- | --- |
@@ -33,7 +33,7 @@ DSH Desktop 是 [DeepSeek Harness](https://github.com/deepseek-ai/deepseek-harne
 Node.js 22.19+、pnpm 11.7：
 
 ```sh
-git clone https://github.com/luo-ross/dsh-desktop.git
+git clone https://github.com/Baixu22/deepseek-harness-destop.git
 cd dsh-desktop
 pnpm install
 pnpm run build
@@ -51,4 +51,4 @@ pnpm --filter @baixu22/dsh-desktop run package:win    # 或 :mac / :linux / :all
 
 ## 项目主页
 
-[github.com/luo-ross/dsh-desktop](https://github.com/luo-ross/dsh-desktop) — issue、release 与路线图均在此。
+[github.com/Baixu22/deepseek-harness-destop](https://github.com/Baixu22/deepseek-harness-destop) — issue、release 与路线图均在此。

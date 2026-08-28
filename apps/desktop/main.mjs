@@ -397,7 +397,7 @@ async function installTopActions(window) {
     if (!document.getElementById('dsh-desktop-repository')) {
       const repository = document.createElement('a');
       repository.id = 'dsh-desktop-repository';
-      repository.href = 'https://github.com/luo-ross/dsh-desktop';
+      repository.href = 'https://github.com/Baixu22/deepseek-harness-destop';
       repository.target = '_blank';
       repository.rel = 'noopener noreferrer';
       repository.textContent = 'GitHub 仓库';
@@ -527,7 +527,7 @@ if (!hasSingleInstanceLock) {
       // shows that shortcut's static icon and ignores `setIcon`, which pins
       // the black whale over the theme-adaptive one; both launch modes use a
       // window-only ID so `applyThemeIcon` always wins.
-      app.setAppUserModelId(app.isPackaged ? 'io.github.luo-ross.dshdesktop.window' : 'io.github.luo-ross.dshdesktop.dev')
+      app.setAppUserModelId(app.isPackaged ? 'io.github.baixu22.dshdesktop.window' : 'io.github.baixu22.dshdesktop.dev')
     }
     Menu.setApplicationMenu(null)
     const cachedBackend = backendRequiredPaths(app.isPackaged

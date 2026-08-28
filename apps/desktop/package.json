@@ -1,19 +1,19 @@
 {
   "name": "@baixu22/dsh-desktop",
   "productName": "DSH",
-  "version": "0.1.25",
+  "version": "0.1.26",
   "description": "Unofficial community desktop edition of DeepSeek Harness",
   "author": {
     "name": "Baixu22",
     "url": "https://github.com/Baixu22/deepseek-harness-destop"
   },
-  "homepage": "https://github.com/luo-ross/dsh-desktop#readme",
+  "homepage": "https://github.com/Baixu22/deepseek-harness-destop#readme",
   "repository": {
     "type": "git",
-    "url": "git+https://github.com/luo-ross/dsh-desktop.git"
+    "url": "git+https://github.com/Baixu22/deepseek-harness-destop.git"
   },
   "bugs": {
-    "url": "https://github.com/luo-ross/dsh-desktop/issues"
+    "url": "https://github.com/Baixu22/deepseek-harness-destop/issues"
   },
   "type": "module",
   "main": "main.mjs",
@@ -39,7 +39,7 @@
     "electron-builder": "26.15.3"
   },
   "build": {
-    "appId": "io.github.luo-ross.dshdesktop",
+    "appId": "io.github.baixu22.dshdesktop",
     "productName": "DSH",
     "asar": true,
     "npmRebuild": false,
@@ -121,8 +121,8 @@
     },
     "publish": {
       "provider": "github",
-      "owner": "luo-ross",
-      "repo": "dsh-desktop"
+      "owner": "Baixu22",
+      "repo": "deepseek-harness-destop"
     },
     "nsis": {
       "installerIcon": "build/icon.ico",
