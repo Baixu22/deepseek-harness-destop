@@ -1,0 +1,29 @@
+/* Theme toggle button: in the wide sidebar foot it keeps the settings
+   trigger's 42px row rhythm with the same 12px rounded-rect hover fill; the
+   rail collapses it to the 36px circle of the rail control family. */
+
+.toggler {
+  flex: none;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 42px;
+  height: 42px;
+  border: none;
+  border-radius: 12px;
+  background: transparent;
+  color: var(--dsw-alias-label-primary);
+  cursor: pointer;
+  transition: background-color var(--ds-transition-duration-fast) var(--ds-ease-in-out);
+}
+
+.toggler:hover {
+  background: var(--dsw-alias-interactive-bg-hover);
+}
+
+/* Rail: the same 36x36 circle box as the other rail controls. */
+.toggler.rail {
+  width: 36px;
+  height: 36px;
+  border-radius: 50%;
+}

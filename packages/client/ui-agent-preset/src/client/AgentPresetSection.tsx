@@ -11,13 +11,15 @@
  */
 
 import { useEffect, useLayoutEffect, useRef, useState } from 'react'
-import type { ReactNode } from 'react'
+import type { CSSProperties, ReactNode } from 'react'
 import {
-  Button, IconBrowseOutline16, IconCopyOutline16, IconFolderOpenOutline16, IconPlusOutline16, IconTrashOutline16, Modal, Tooltip,
+  Button, IconBrowseOutline16, IconCodeOutline16, IconCopyOutline16, IconCordisPluginOutline14,
+  IconEditOutline16, IconFolderOpenOutline16, IconPlusOutline16, IconSparkle16, IconTrashOutline16,
+  IconUserOutline16, IconWarningOutline16, Modal, Tooltip,
 } from '@deepseek-ai/dsh-client-ui-primitives'
 import type { SnapshotStore } from '@deepseek-ai/dsh-client-runtime/client'
 import type { InjectFace, PropsLocale, PropsRuntime } from '@deepseek-ai/dsh-client-ui-slots'
-import { draftBlocker, type AgentPresetSectionState } from './section-store.ts'
+import { draftBlocker, type AgentPresetSectionState, type PresetRow } from './section-store.ts'
 import { presetDisplayText, type AgentPresetSettingsKey } from './locales.ts'
 import css from './AgentPresetSection.module.css'
 
@@ -138,35 +140,93 @@ function CopyDialog({ state, t, actions }: CopyDialogProps): ReactNode {
 }
 
 /**
- * Render one card's description, clamped by CSS and offered in full on hover.
- * The tooltip is attached only while the text is actually cut off, so a short
- * description does not answer a hover with a bubble repeating the card.
+ * Render one card's description, magicui bento-grid style: a description
+ * longer than one line becomes a marquee that auto-scrolls and pauses while
+ * the card is hovered or focused; a short one stays static. The tooltip is
+ * attached only while the text scrolls, so a short description does not
+ * answer a hover with a bubble repeating the card.
  * @param props.text - the description as rendered, already localized.
  * @returns the description element, tooltip-anchored while it overflows.
  */
 function CardDescription({ text }: { text: string }): ReactNode {
   const ref = useRef<HTMLSpanElement | null>(null)
-  const [truncated, setTruncated] = useState(false)
+  const [overflowing, setOverflowing] = useState(false)
   useLayoutEffect(() => {
     const el = ref.current
     /* v8 ignore next -- the ref is attached before layout effects run. */
     if (el === null) return
-    const measure = () => { setTruncated(el.scrollHeight > el.clientHeight) }
+    // The face is nowrap, so horizontal overflow is the truncation verdict;
+    // the hidden measurer keeps it stable while the visible face swaps.
+    const measure = () => { setOverflowing(el.scrollWidth > el.clientWidth) }
     measure()
     // Card width follows the settings pane, which resizes with the window.
     if (typeof ResizeObserver === 'undefined') return
     const observer = new ResizeObserver(measure)
     observer.observe(el)
     return () => { observer.disconnect() }
-  }, [text])
+  }, [text, overflowing])
+  // Roughly constant scroll speed across description lengths.
+  const duration = `${Math.min(45, Math.max(12, Math.round(Array.from(text).length * 0.4)))}s`
   return (
     // Capped near the card's own width: the default half-viewport bubble would
     // spill a description out of the settings dialog and across the app behind it.
-    <Tooltip label={text} side="bottom" delayMs={400} disabled={!truncated} maxWidth={360}>
-      {/* The empty title stops the card body's native tooltip from climbing to
-        this span: a cut-off description answers with one bubble, not two. */}
-      <span ref={ref} className={css.cardDesc} title="">{text}</span>
+    <Tooltip label={text} side="bottom" delayMs={400} disabled={!overflowing} maxWidth={360}>
+      {overflowing
+        ? (
+          <span className={`${css.cardDesc} ${css.cardDescScroll}`} title="">
+            {/* Hidden nowrap measurer: owns the overflow verdict. */}
+            <span ref={ref} className={css.cardDescMeasure} aria-hidden="true">{text}</span>
+            <span className={css.marquee} style={{ '--marquee-duration': duration } as CSSProperties}>
+              <span className={css.marqueeCopy}>{text}</span>
+              <span className={css.marqueeCopy} aria-hidden="true">{text}</span>
+            </span>
+          </span>
+        )
+        : (
+          /* The empty title stops the card body's native tooltip from climbing
+            to this span: a cut-off description answers with one bubble, not two. */
+          <span ref={ref} className={css.cardDesc} title="">{text}</span>
+        )}
     </Tooltip>
+  )
+}
+
+/** Shipped-preset glyph by id; unknown shipped ids fall back to the sparkle mark. */
+function systemGlyph(id: string, size: number): ReactNode {
+  if (id === 'code') return <IconCodeOutline16 size={size} />
+  if (id === 'minimal') return <IconEditOutline16 size={size} />
+  if (id === 'cordis') return <IconCordisPluginOutline14 size={size} />
+  return <IconSparkle16 size={size} />
+}
+
+/**
+ * The card's SVG core display: the preset glyph on a tinted dot-grid tile.
+ * Wide bento cells get the larger tile with a decorative orbit ring; a broken
+ * preset trades the brand tint for the error one.
+ * @param props.row - roster row the figure belongs to.
+ * @param props.wide - whether the card occupies a wide bento cell.
+ * @returns the decorative figure; the preset name carries the accessible text.
+ */
+function PresetFigure({ row, wide }: { row: PresetRow; wide: boolean }): ReactNode {
+  const broken = row.broken !== undefined
+  const size = wide ? 34 : 20
+  const glyph = broken
+    ? <IconWarningOutline16 size={size} />
+    : row.trust === 'user' ? <IconUserOutline16 size={size} /> : systemGlyph(row.id, size)
+  const classes = [css.figure, wide ? css.figureWide : '', broken ? css.figureBroken : '']
+    .filter(part => part !== '').join(' ')
+  return (
+    <span className={classes} aria-hidden="true">
+      {wide && !broken
+        ? (
+          <svg className={css.figureOrbit} viewBox="0 0 96 96" fill="none" xmlns="http://www.w3.org/2000/svg">
+            <rect x="10" y="10" width="76" height="76" rx="24" stroke="currentColor" strokeOpacity=".25" strokeDasharray="3 5" />
+            <rect x="22" y="22" width="52" height="52" rx="17" stroke="currentColor" strokeOpacity=".45" />
+          </svg>
+        )
+        : null}
+      {glyph}
+    </span>
   )
 }
 
@@ -241,17 +301,28 @@ export function AgentPresetSection(props: AgentPresetSectionProps): ReactNode {
         // stays on screen even while empty: heading plus the creator entry.
         const tail = trust === 'user' ? creatorButton : null
         if (group.length === 0 && tail === null) return null
+        // Bento sizing: the lead card becomes the wide feature cell once the
+        // grid holds three or more cells; an even roster wider than three
+        // would otherwise leave its last card alone in the final row, so the
+        // last card takes a wide cell too and every row stays balanced.
+        const tailCount = tail === null ? 0 : 1
+        const firstWide = group.length + tailCount >= 3
+        const lastWide = group.length >= 3 && group.length % 2 === 0
         return (
           <section key={trust} className={css.group}>
             <h3 className={css.groupHead}>{heading}</h3>
-            {group.length === 0 ? null : (
-              <ul className={css.cards}>
-                {group.map(({ row, text }) => (
+            <ul className={css.bento}>
+              {group.map(({ row, text }, index) => {
+                const wide = (index === 0 && firstWide) || (index === group.length - 1 && lastWide)
+                return (
                   <li
                     key={row.id}
-                    className={row.broken !== undefined
-                      ? `${css.card} ${css.cardBroken}`
-                      : row.isDefault ? `${css.card} ${css.cardActive}` : css.card}
+                    className={[
+                      row.broken !== undefined
+                        ? `${css.card} ${css.cardBroken}`
+                        : row.isDefault ? `${css.card} ${css.cardActive}` : css.card,
+                      wide ? css.bentoWide : '',
+                    ].filter(part => part !== '').join(' ')}
                   >
                     {/* The card body IS the control: picking a preset is the
                       common act, so it should not hide behind a small button.
@@ -261,7 +332,7 @@ export function AgentPresetSection(props: AgentPresetSectionProps): ReactNode {
                       disabled and the card says why instead of offering it. */}
                     <button
                       type="button"
-                      className={css.cardMain}
+                      className={wide ? `${css.cardMain} ${css.cardMainWide}` : css.cardMain}
                       aria-pressed={row.isDefault}
                       disabled={row.isDefault || row.broken !== undefined}
                       // Without this the name is the whole card read aloud —
@@ -270,21 +341,24 @@ export function AgentPresetSection(props: AgentPresetSectionProps): ReactNode {
                       title={row.broken ?? (row.isDefault ? t('inUse') : t('setDefault'))}
                       onClick={() => { void props.makeDefault(row.id) }}
                     >
-                      <span className={css.cardHead}>
-                        <span className={css.cardName}>{text.name}</span>
-                        {row.broken !== undefined
-                          ? <span className={css.brokenBadge}>{t('brokenBadge')}</span>
-                          : null}
-                        <span className={css.badge}>
-                          {row.trust === 'user' ? t('userTrust') : t('builtIn')}
+                      <PresetFigure row={row} wide={wide} />
+                      <span className={css.cardText}>
+                        <span className={css.cardHead}>
+                          <span className={css.cardName}>{text.name}</span>
+                          {row.broken !== undefined
+                            ? <span className={css.brokenBadge}>{t('brokenBadge')}</span>
+                            : null}
+                          <span className={css.badge}>
+                            {row.trust === 'user' ? t('userTrust') : t('builtIn')}
+                          </span>
+                          {row.isDefault ? <span className={css.inUse}>{t('inUse')}</span> : null}
                         </span>
-                        {row.isDefault ? <span className={css.inUse}>{t('inUse')}</span> : null}
+                        <CardDescription text={text.description ?? t('noDescription')} />
+                        {row.broken === undefined
+                          ? null
+                          : <span className={css.cardBrokenReason} role="alert">{row.broken}</span>}
+                        <code className={css.cardId}>{row.id}</code>
                       </span>
-                      <CardDescription text={text.description ?? t('noDescription')} />
-                      {row.broken === undefined
-                        ? null
-                        : <span className={css.cardBrokenReason} role="alert">{row.broken}</span>}
-                      <code className={css.cardId}>{row.id}</code>
                     </button>
                     <div className={css.cardFoot}>
                       {/* Shipped presets are the compositions a copy starts
@@ -354,10 +428,10 @@ export function AgentPresetSection(props: AgentPresetSectionProps): ReactNode {
                         </p>
                       )}
                   </li>
-                ))}
-              </ul>
-            )}
-            {tail}
+                )
+              })}
+              {tail === null ? null : <li className={css.bentoTail}>{tail}</li>}
+            </ul>
           </section>
         )
       })}

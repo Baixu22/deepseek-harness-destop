@@ -1,0 +1,108 @@
+/* Long-text collapse card — transcribed from the DeepSeek Chat reference:
+   a 16px-radius pill, thin elevated border, 28px blue document icon, a 14px
+   medium title, and a 12px underlined action row with a ↙ arrow. A circular
+   dismiss (✕) surfaces at the top-right on hover when a dismiss is wired. */
+
+.card {
+  position: relative;
+  display: inline-flex;
+  max-width: 100%;
+  box-sizing: border-box;
+  border: 0.667px solid var(--dsw-alias-border-l2-darkmode-thin);
+  border-radius: 16px;
+  background: var(--dsw-specific-selector);
+  transition: background-color 100ms ease;
+}
+
+.card:hover {
+  background: var(--dsw-alias-interactive-bg-hover-solid);
+}
+
+/* The whole body is the expand/paste-back target: an unstyled button that
+   fills the pill and lays out icon + text column. */
+.hit {
+  display: flex;
+  align-items: center;
+  min-width: 0;
+  box-sizing: border-box;
+  width: 100%;
+  margin: 0;
+  padding: 8px 12px;
+  border: none;
+  background: transparent;
+  color: inherit;
+  font-family: inherit;
+  text-align: left;
+  cursor: pointer;
+}
+
+.icon {
+  flex: none;
+  display: block;
+  width: 28px;
+  height: 28px;
+  margin-right: 10px;
+}
+
+.body {
+  display: flex;
+  flex-direction: column;
+  min-width: 0;
+}
+
+.title {
+  max-width: 220px;
+  overflow: hidden;
+  font-size: 14px;
+  font-weight: 500;
+  line-height: 22px;
+  color: var(--dsw-alias-label-primary);
+  white-space: nowrap;
+  text-overflow: ellipsis;
+}
+
+/* Action row: an inline (content-width) underlined label with a leading ↙.
+   The underline is a border-bottom so it hugs the text, matching the
+   reference (color #ADB8B8, 12px, 2px gap). */
+.action {
+  display: inline-flex;
+  align-self: flex-start;
+  align-items: center;
+  gap: 2px;
+  margin-top: 2px;
+  border-bottom: 0.667px solid var(--dsw-alias-label-caption);
+  font-size: 12px;
+  font-weight: 400;
+  line-height: 18px;
+  color: var(--dsw-alias-label-caption);
+  white-space: nowrap;
+}
+
+.actionArrow {
+  flex: none;
+  width: 12px;
+  height: 12px;
+}
+
+.close {
+  position: absolute;
+  top: 6px;
+  right: 6px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 18px;
+  height: 18px;
+  padding: 0;
+  border: none;
+  border-radius: 50%;
+  background: var(--dsw-alias-label-primary);
+  color: var(--dsw-specific-selector);
+  cursor: pointer;
+  opacity: 0;
+  transition: opacity 100ms ease;
+}
+
+.card:hover .close {
+  opacity: 1;
+}

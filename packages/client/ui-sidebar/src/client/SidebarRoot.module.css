@@ -210,6 +210,29 @@
   color: var(--dsw-alias-label-primary);
 }
 
+/* Icon motion: every control states its from -> to. The shell icons scale
+   up one step on hover; the rail's hover-swapped panel icon pops in at the
+   swap instead of hard-cutting between the two glyphs. The New Session plus
+   stays still: its quarter-turn spin read as noise. */
+.iconButton svg {
+  transition: transform 150ms var(--ds-ease-in-out);
+}
+
+.iconButton:hover svg {
+  transform: scale(1.08);
+}
+
+@keyframes icon-pop {
+  from {
+    opacity: 0;
+    transform: scale(0.6);
+  }
+}
+
+.collapsed .toggle:hover .panelIcon {
+  animation: icon-pop 150ms var(--ds-ease-in-out);
+}
+
 .buildRevision {
   display: inline-flex;
   align-items: center;
@@ -238,7 +261,10 @@
   box-sizing: border-box;
   border: 1px solid var(--dsw-alias-border-l2);
   border-radius: 12px;
-  background: var(--dsw-alias-button-elevated-fill);
+  /* background-color, not the shorthand: the shorthand would reset
+     LiquidButton's background-image fill sheet (same specificity, later in
+     the bundle) and the liquid sweep would never render. */
+  background-color: var(--dsw-alias-button-elevated-fill);
   color: var(--dsw-alias-label-primary);
   font-size: 14px;
   font-weight: 500;
@@ -247,9 +273,8 @@
   overflow: hidden;
 }
 
-.newSession:hover {
-  background: var(--dsw-alias-button-floating-hover);
-}
+/* Hover feedback is the LiquidButton fill (see LiquidButton.module.css):
+   the sheet sweeps across with the same floating-hover token. */
 
 .collapsed .newSession {
   align-self: flex-start;
@@ -334,6 +359,18 @@
   .railIn .footArea,
   .railIn .regionArea {
     transition: none;
+    animation: none;
+  }
+
+  .iconButton svg {
+    transition: none;
+  }
+
+  .iconButton:hover svg {
+    transform: none;
+  }
+
+  .collapsed .toggle:hover .panelIcon {
     animation: none;
   }
 }

@@ -309,10 +309,10 @@ export function createWelcomePage({ cachedBackend = false, frameless, iconDataUr
   ${frameless ? createWindowControlsMarkup() : ''}
   <header class="ds-header-wrapper">
     <div class="ds-header-bar">
-      <a class="ds-logo" href="https://github.com/Baixu22/deepseek-harness-destop" target="_blank" rel="noopener noreferrer" aria-label="DSH 桌面版">${OFFICIAL_LOGO_SVG}</a>
+      <a class="ds-logo" href="https://github.com/luo-ross/dsh-desktop" target="_blank" rel="noopener noreferrer" aria-label="DSH 桌面版">${OFFICIAL_LOGO_SVG}</a>
       <div class="header-right">
         <div class="gh-wrap">
-          <a class="ds-btn-ghost" href="https://github.com/Baixu22/deepseek-harness-destop" target="_blank" rel="noopener noreferrer">GitHub</a>
+          <a class="ds-btn-ghost" href="https://github.com/luo-ross/dsh-desktop" target="_blank" rel="noopener noreferrer">GitHub</a>
           ${previewPanel}
         </div>
         <span class="ver-pill">DSH v${version}</span>
@@ -325,18 +325,18 @@ export function createWelcomePage({ cachedBackend = false, frameless, iconDataUr
     <div class="hero-container">
       <div class="hero-left">
         <div class="hero-block">
-          <a class="announce" href="https://github.com/Baixu22/deepseek-harness-destop" target="_blank" rel="noopener noreferrer">
+          <a class="announce" href="https://github.com/luo-ross/dsh-desktop" target="_blank" rel="noopener noreferrer">
             <span class="sparkle-wrap">${SPARKLE_SVG}</span><span class="txt">在原生 Windows 窗口中使用 DeepSeek Harness。应用正在准备本地运行环境，完成后将直接进入主窗口。</span><span class="arrow">${ARROW_SVG}</span>
           </a>
           <h1><span data-cursor="blend">探索未至之境</span></h1>
         </div>
         <div class="cta-group">
-          <a class="cta-card" href="https://github.com/Baixu22/deepseek-harness-destop" target="_blank" rel="noopener noreferrer">
+          <a class="cta-card" href="https://github.com/luo-ross/dsh-desktop" target="_blank" rel="noopener noreferrer">
             <span class="cta-title">本地桌面体验</span>
             <span class="cta-desc">内置 DeepSeek Harness 服务
 无需手动启动网页版</span>
           </a>
-          <a class="cta-card" href="https://github.com/Baixu22/deepseek-harness-destop/releases" target="_blank" rel="noopener noreferrer">
+          <a class="cta-card" href="https://github.com/luo-ross/dsh-desktop/releases" target="_blank" rel="noopener noreferrer">
             <span class="cta-title">即开即用</span>
             <span class="cta-desc">工作区、模型与会话能力
 准备完成后自动进入</span>

@@ -150,6 +150,15 @@
     - id: client-hmr
       name: '@deepseek-ai/dsh-client-hmr'
 
+    # The sidebar workbench (files/editor, terminal, Git, side chat, tasks),
+    # mounted in-box so every dsh web deployment ships it by default. Its host
+    # half registers the /sidebar routes on the webserver; its client half is
+    # a dsh.client package the modules node half scans like any roster row.
+    # The terminal shell resolves $SHELL / login shell / powershell.exe unless
+    # a later layer overrides `config.shell`.
+    - id: better-sidebar
+      name: 'dsh-better-sidebar'
+
     # ── browser plugin roster (dsh.client rows; node halves are layer-2 hosts) ──
 
     # Dual-face: the node half scans this tree, composes window.__DSH_BOOT__,

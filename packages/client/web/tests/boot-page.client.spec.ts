@@ -1,6 +1,6 @@
 // @vitest-environment jsdom
-import { afterEach, describe, expect, it } from 'vitest'
-import { BootPage } from '../src/boot-page.ts'
+import { afterEach, describe, expect, it, vi } from 'vitest'
+import { BootPage, BOOT_REVEAL_MIN_MS } from '../src/boot-page.ts'
 
 afterEach(() => { document.body.innerHTML = '' })
 
@@ -14,21 +14,22 @@ describe('BootPage', () => {
   it('draws the loading skeleton before any plugin state arrives', () => {
     const { el } = mount()
     expect(el.firstElementChild?.getAttribute('data-dsh-boot')).toBe('')
-    expect(el.textContent).toContain('HARNESS')
+    expect(el.textContent).toContain('DeepSeek Harness')
     expect(el.textContent).toContain('Loading plugins…')
   })
 
-  it('keeps loading while entries are active or loading', () => {
+  it('sweeps the brand reveal from real loader progress', () => {
     const { el, page } = mount()
     page.setTotal(2)
-    const spinner = el.querySelector<HTMLElement>('[data-dsh-boot-spinner]')
-    expect(spinner?.style.getPropertyValue('--dsh-boot-arc')).toBe('72deg')
+    const reveal = el.querySelector<HTMLElement>('[data-dsh-boot-reveal]')
+    expect(reveal?.dataset.dshBootRatio).toBe('0.000')
     page.setState('a', 'active')
-    expect(spinner?.style.getPropertyValue('--dsh-boot-arc')).toBe('180deg')
+    expect(reveal?.dataset.dshBootRatio).toBe('0.500')
     page.setState('b', 'loading')
-    expect(el.querySelector('[data-dsh-boot-spinner]')).toBe(spinner)
+    expect(el.querySelector('[data-dsh-boot-reveal]')).toBe(reveal)
+    expect(reveal?.dataset.dshBootRatio).toBe('0.500')
     page.setState('b', 'active')
-    expect(spinner?.style.getPropertyValue('--dsh-boot-arc')).toBe('288deg')
+    expect(reveal?.dataset.dshBootRatio).toBe('1.000')
     expect(el.textContent).toContain('Loading plugins…')
     expect(el.textContent).not.toContain('Failed to load plugins')
   })
@@ -57,5 +58,56 @@ describe('BootPage', () => {
     const { el, page } = mount()
     page.dispose()
     expect(el.childNodes).toHaveLength(0)
+  })
+
+  it('settles the reveal synchronously once the roster completes without animation frames', async () => {
+    const { page } = mount()
+    page.setTotal(1)
+    page.setState('a', 'active')
+    await page.awaitReveal()
+    await page.awaitReveal()
+  })
+
+  it('settles the reveal on failure even without loader progress', async () => {
+    const { page } = mount()
+    page.fail('web boot: host preparation failed')
+    await page.awaitReveal()
+  })
+
+  it('plays the full reveal for at least the minimum duration when loading settles fast', async () => {
+    vi.stubGlobal('requestAnimationFrame', () => 0)
+    vi.useFakeTimers()
+    try {
+      const { el, page } = mount()
+      page.setTotal(1)
+      page.setState('a', 'active')
+      let settled = false
+      void page.awaitReveal().then(() => { settled = true })
+      await vi.advanceTimersByTimeAsync(BOOT_REVEAL_MIN_MS - 200)
+      expect(settled).toBe(false)
+      expect(el.querySelector('[data-dsh-boot-reveal]')).not.toBeNull()
+      await vi.advanceTimersByTimeAsync(400)
+      expect(settled).toBe(true)
+    } finally {
+      vi.useRealTimers()
+      vi.unstubAllGlobals()
+    }
+  })
+
+  it('cancels the playback and settles reveal waiters on disposal', async () => {
+    vi.stubGlobal('requestAnimationFrame', () => 0)
+    vi.useFakeTimers()
+    try {
+      const { page } = mount()
+      page.setTotal(1)
+      let settled = false
+      void page.awaitReveal().then(() => { settled = true })
+      page.dispose()
+      await vi.advanceTimersByTimeAsync(0)
+      expect(settled).toBe(true)
+    } finally {
+      vi.useRealTimers()
+      vi.unstubAllGlobals()
+    }
   })
 })

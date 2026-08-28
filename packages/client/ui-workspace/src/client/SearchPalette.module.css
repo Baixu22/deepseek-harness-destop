@@ -1,0 +1,208 @@
+/* Session search palette: full-viewport mask + centered command panel. The
+   mask/panel tokens match the settings shell (Modal primitive's
+   --dsw-alias-bg-mask-1 + --dsw-mask-blur, layer-2 surface, lv3 shadow); the
+   panel morphs from the sidebar search trigger through the shared layoutId. */
+
+.overlay {
+  position: fixed;
+  inset: 0;
+  z-index: 1000;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.mask {
+  position: absolute;
+  inset: 0;
+  background: var(--dsw-alias-bg-mask-1);
+  backdrop-filter: var(--dsw-mask-blur);
+}
+
+/* Panel: 640 wide, viewport-capped height; field row, scrolling body, and
+   the static hint footer split it. The elevated-surface scrollbar tokens
+   match the settings panel. */
+.panel {
+  position: relative;
+  z-index: 1;
+  display: flex;
+  flex-direction: column;
+  width: 640px;
+  height: min(560px, calc(100vh - 48px));
+  max-width: calc(100vw - 48px);
+  border-radius: 16px;
+  overflow: hidden;
+  background: var(--dsw-alias-bg-layer-2);
+  box-shadow: var(--dsw-shadow-lv3);
+  --dsh-scrollbar-thumb: var(--dsw-alias-scrollbar-bg-l2);
+  --dsh-scrollbar-thumb-hover: var(--dsw-alias-scrollbar-hover-l2);
+}
+
+/* Query field row: 52px, search glyph leading, Esc chip trailing. */
+.fieldRow {
+  flex: none;
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  height: 52px;
+  padding: 0 16px;
+  box-sizing: border-box;
+  border-bottom: 1px solid var(--dsw-alias-border-l2);
+}
+
+.fieldIcon {
+  flex: none;
+  color: var(--dsw-alias-label-tertiary);
+}
+
+.field {
+  flex: 1;
+  min-width: 0;
+  border: none;
+  outline: none;
+  background: transparent;
+  font-family: inherit;
+  font-size: 14px;
+  line-height: 22px;
+  color: var(--dsw-alias-label-primary);
+}
+
+.field::placeholder {
+  color: var(--dsw-alias-label-tertiary);
+}
+
+.kbd {
+  flex: none;
+  padding: 1px 6px;
+  border: 1px solid var(--dsw-alias-border-l2);
+  border-radius: 6px;
+  font-family: inherit;
+  font-size: 11px;
+  line-height: 16px;
+  color: var(--dsw-alias-label-tertiary);
+}
+
+/* Scrolling body: the chats section label plus result rows. */
+.body {
+  flex: 1;
+  min-height: 0;
+  padding: 14px 8px 8px;
+  box-sizing: border-box;
+  overflow-y: auto;
+}
+
+.sectionLabel {
+  padding: 0 10px;
+  font-size: 12px;
+  line-height: 20px;
+  font-weight: 500;
+  color: var(--dsw-alias-label-tertiary);
+}
+
+.results {
+  margin-top: 6px;
+}
+
+.results > * + * {
+  margin-top: 2px;
+}
+
+.searchStatus,
+.searchWarning {
+  padding: 10px 10px;
+  font-size: 12px;
+  line-height: 18px;
+  color: var(--dsw-alias-label-tertiary);
+}
+
+.searchWarning {
+  color: var(--dsw-alias-label-secondary);
+}
+
+/* Pending-state pulse: three dots breathing after the status text. */
+.dots {
+  display: inline-flex;
+  align-items: center;
+  gap: 3px;
+  margin-left: 6px;
+}
+
+.dot {
+  width: 4px;
+  height: 4px;
+  border-radius: 50%;
+  background: var(--dsw-alias-label-tertiary);
+}
+
+.emptyState {
+  padding: 16px 10px;
+  font-size: 13px;
+  line-height: 20px;
+  color: var(--dsw-alias-label-tertiary);
+}
+
+/* Quick actions: full-width icon+label rows, pinned between the scrolling
+   body and the hint footer so they stay reachable without scrolling. */
+.actionsSection {
+  flex: none;
+  padding: 8px 8px 6px;
+  border-top: 1px solid var(--dsw-alias-border-l2);
+}
+
+.actionList {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  margin-top: 6px;
+}
+
+.action {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  width: 100%;
+  padding: 8px 10px;
+  box-sizing: border-box;
+  border: none;
+  border-radius: 10px;
+  background: transparent;
+  cursor: pointer;
+  font-family: inherit;
+  font-size: 13px;
+  line-height: 20px;
+  color: var(--dsw-alias-label-primary);
+  text-align: left;
+}
+
+.action:hover,
+.actionActive {
+  background: var(--dsw-alias-interactive-bg-hover);
+}
+
+.actionLabel {
+  min-width: 0;
+  overflow: hidden;
+  white-space: nowrap;
+  text-overflow: ellipsis;
+}
+
+/* Footer: static keyboard hints; visual echo of the kbd chips in the field. */
+.footer {
+  flex: none;
+  display: flex;
+  align-items: center;
+  gap: 16px;
+  height: 40px;
+  padding: 0 16px;
+  box-sizing: border-box;
+  border-top: 1px solid var(--dsw-alias-border-l2);
+  font-size: 12px;
+  line-height: 18px;
+  color: var(--dsw-alias-label-tertiary);
+}
+
+.hint {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+}

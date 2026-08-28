@@ -5,6 +5,33 @@
    54px header and the 24px-padded options area. */
 
 /* Trigger row: the 42px foot-row box shared with the Cordis footer action. */
+/* Sidebar-foot row: the optional leading control (theme toggler) sits to
+   the left of the settings trigger when wide; the rail stacks the two
+   circles inside the 56px column. */
+.triggerRow {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  width: calc(100% + 4px);
+  margin: 4px -2px;
+}
+
+.triggerRow .trigger {
+  flex: 1;
+  width: auto;
+  margin: 0;
+}
+
+.triggerRow.rail {
+  flex-direction: column;
+  width: auto;
+  margin: 0;
+}
+
+.triggerRow.rail .trigger {
+  flex: none;
+}
+
 .trigger {
   flex: none;
   display: flex;
@@ -28,6 +55,33 @@
 
 .trigger:hover {
   background: var(--dsw-alias-interactive-bg-hover);
+}
+
+/* Trigger icon motion: the gear rotates a quarter turn on hover, from 0 to
+   90deg and back on leave. */
+.trigger svg {
+  transition: transform 200ms var(--ds-ease-in-out);
+}
+
+.trigger:hover svg {
+  transform: rotate(90deg);
+}
+
+/* The scale-correction wrapper (the button's only child) owns the flex row
+   the button box used to: the layoutId morph transform-scales the box, so
+   the row layout cannot live on it. */
+.trigger > div {
+  display: flex;
+  flex: 1;
+  align-items: center;
+  gap: 8px;
+  min-width: 0;
+}
+
+.trigger.rail > div {
+  flex: none;
+  justify-content: center;
+  gap: 0;
 }
 
 /* Rail trigger: the same 36x36 circle box as the other rail controls. */
@@ -139,8 +193,39 @@
   text-align: left;
 }
 
+/* Main-title hover: a soft brand shimmer sweeps the cell once while it lifts,
+   instead of the flat fill alone. The cell clips the sweep and owns its own
+   transition (.nav .navCell out-specifics the panel-wide :where(button) rule
+   declared below). */
+.nav .navCell {
+  position: relative;
+  overflow: hidden;
+  transition: background-color .18s ease, box-shadow .18s ease, transform .18s ease;
+}
+
+.navCell::before {
+  content: '';
+  position: absolute;
+  inset: 0;
+  border-radius: inherit;
+  background: linear-gradient(100deg,
+    transparent 25%,
+    color-mix(in srgb, var(--dsw-alias-brand-primary) 18%, transparent) 50%,
+    transparent 75%);
+  transform: translateX(-110%);
+  pointer-events: none;
+}
+
+.navCell:hover::before,
+.navCell:focus-visible::before {
+  transform: translateX(110%);
+  transition: transform .6s ease;
+}
+
 .navCell:hover {
   background: var(--dsw-specific-sidebar-nav-item-hover);
+  box-shadow: 0 3px 12px color-mix(in srgb, var(--dsw-alias-label-primary) 10%, transparent);
+  transform: translateY(-1px);
 }
 
 .navCell.active {
@@ -149,6 +234,7 @@
 
 .navIcon {
   flex: none;
+  transition: transform .18s ease, color .18s ease;
 }
 
 .navLabel {
@@ -157,6 +243,11 @@
   overflow: hidden;
   white-space: nowrap;
   text-overflow: ellipsis;
+}
+
+.navCell:hover .navIcon {
+  color: var(--dsw-alias-brand-primary);
+  transform: scale(1.12);
 }
 
 /* Content column (figma Content 501:29980): header + options. */
@@ -215,6 +306,26 @@
   overflow-y: auto;
 }
 
+@media (prefers-reduced-motion: reduce) {
+  .navCell::before {
+    display: none;
+  }
+
+  .navCell:hover,
+  .navCell:hover .navIcon,
+  .navCell:hover .navLabel {
+    transform: none;
+  }
+
+  .trigger svg {
+    transition: none;
+  }
+
+  .trigger:hover svg {
+    transform: none;
+  }
+}
+
 /* Visually-hidden text seat (close button accessible name from slot content). */
 .hiddenLabel {
   position: absolute;
@@ -223,4 +334,17 @@
   overflow: hidden;
   clip: rect(0 0 0 0);
   white-space: nowrap;
+}
+
+/* Cohesive interaction feedback for every panel control: visible hover fill,
+   smooth transitions, and a subtle press scale. :where() keeps specificity at
+   the panel level so component-owned hover tokens (nav cells etc.) win. */
+.panel :where(button) {
+  transition: background-color .16s ease, border-color .16s ease, box-shadow .16s ease, transform .12s ease;
+}
+.panel :where(button:hover) {
+  background-color: var(--dsw-alias-interactive-bg-hover);
+}
+.panel :where(button:active) {
+  transform: scale(.98);
 }

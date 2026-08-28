@@ -58,6 +58,7 @@ export function GenericCommandCard({ node, t, runningSummary }: GenericCommandCa
         expandable={body !== null}
         expandOnRowClick
         keepContentWhenOpen
+        morphBody
         onToggle={() => { setExpanded(value => !value) }}
         collapsedContent={(
           <>

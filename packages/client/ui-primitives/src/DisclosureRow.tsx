@@ -1,6 +1,7 @@
 import { type KeyboardEvent, type MouseEvent, type ReactNode } from 'react'
 import clsx from 'clsx'
 import { IconChevronDownOutline14 } from './icons/index.tsx'
+import { MorphReveal } from './MorphReveal.tsx'
 import css from './DisclosureRow.module.css'
 
 /** Shared 24px disclosure chrome for compact flow rows. */
@@ -16,6 +17,10 @@ export interface DisclosureRowProps {
   previewChevron?: boolean | undefined
   /** Keeps `collapsedContent` inline while open. */
   keepContentWhenOpen?: boolean | undefined
+  /** Morphs the body open in place (height + blur crossfade) instead of
+   * mounting it instantly; the body stays mounted through the collapse
+   * animation. */
+  morphBody?: boolean | undefined
   collapsedContent?: ReactNode
   children?: ReactNode
   className?: string | undefined
@@ -39,6 +44,7 @@ export function DisclosureRow({
   expandOnRowClick = false,
   previewChevron = expandable,
   keepContentWhenOpen = false,
+  morphBody = false,
   collapsedContent,
   children,
   className,
@@ -98,7 +104,9 @@ export function DisclosureRow({
         <span className={clsx(css.title, titleClassName)}>{title}</span>
         {(keepContentWhenOpen || !open) && collapsedContent}
       </div>
-      {open && children}
+      {morphBody
+        ? <MorphReveal open={open}>{children}</MorphReveal>
+        : (open && children)}
     </div>
   )
 }

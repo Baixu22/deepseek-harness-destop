@@ -30,11 +30,26 @@
   gap: 16px;
 }
 
+/*
+ * Dia-style brand reveal: the wordmark is clipped text whose gradient band
+ * sweeps left-to-right as real loader entries activate (see boot-page.ts).
+ */
 .wordmark {
-  font-size: 16px;
-  line-height: 24px;
+  font-size: clamp(28px, 6vw, 64px);
+  line-height: 1;
   font-weight: 600;
-  letter-spacing: 0.08em;
+  letter-spacing: 0.05em;
+  white-space: nowrap;
+  color: transparent;
+  -webkit-background-clip: text;
+  background-clip: text;
+  background-size: 100% 100%;
+  transform: translateY(-2px);
+}
+
+/* Failure reports freeze the reveal into solid theme text. */
+.solid {
+  background-image: none;
   color: var(--dsw-alias-label-primary, var(--dsh-boot-label-primary));
 }
 
@@ -42,32 +57,6 @@
   font-size: 12px;
   line-height: 18px;
   color: var(--dsw-alias-label-tertiary, var(--dsh-boot-label-tertiary));
-}
-
-.spinner {
-  position: relative;
-  width: 20px;
-  height: 20px;
-  border-radius: 50%;
-  border: 2px solid var(--dsw-alias-border-l2, var(--dsh-boot-border));
-  animation: spin 0.8s linear infinite;
-}
-
-.spinner::after {
-  content: '';
-  position: absolute;
-  inset: -2px;
-  border-radius: inherit;
-  background: conic-gradient(
-    var(--dsw-alias-brand-primary, var(--dsh-boot-brand)) var(--dsh-boot-arc, 72deg),
-    transparent 0
-  );
-  -webkit-mask: radial-gradient(farthest-side, transparent calc(100% - 2px), #000 0);
-  mask: radial-gradient(farthest-side, transparent calc(100% - 2px), #000 0);
-}
-
-@keyframes spin {
-  to { transform: rotate(360deg); }
 }
 
 .failed {

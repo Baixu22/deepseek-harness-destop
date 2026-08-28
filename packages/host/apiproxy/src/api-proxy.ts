@@ -119,8 +119,14 @@ const SESSION_SEARCH_PROVIDER_CALL_LIMIT = 100
 
 /** Bound cold-log stat fan-out and settle each started batch before cancellation returns. */
 const COLD_SUMMARY_BATCH_SIZE = 16
-/** Default maximum artifact size eligible for one cold blankness read. */
-export const DEFAULT_COLD_BLANK_PROBE_MAX_BYTES = 1024
+/**
+ * Default maximum artifact size eligible for one cold blankness read. The
+ * same probe repairs a missing projection cache row and therefore carries the
+ * list preview, so the threshold must admit normal conversation logs, not
+ * only seed-sized artifacts; repeated listings reuse the probe memo instead
+ * of re-reading an unchanged artifact.
+ */
+export const DEFAULT_COLD_BLANK_PROBE_MAX_BYTES = 16 * 1024 * 1024
 
 /** Conversation message event types (the pagination counting unit). */
 const MESSAGE_TYPES = new Set(['user/message', 'assistant/message'])
@@ -449,20 +455,36 @@ function sessionBlank(session: Session): boolean {
   return !session.events.some(event => event.type === 'turn/start')
 }
 
+/** Session-list preview bound, in UTF-16 code units. */
+const SESSION_LIST_PREVIEW_MAX = 120
+
+/** First text block of a user-authored message, whitespace collapsed and preview-truncated. */
+function promptPreviewText(event: SessionEvent): string | null {
+  const text = event.type === 'user/message'
+    ? event.data.content.find(block => block.type === 'text')?.text
+    : undefined
+  if (text === undefined) return null
+  const collapsed = text.replace(/\s+/g, ' ').trim()
+  if (collapsed === '') return null
+  return collapsed.length <= SESSION_LIST_PREVIEW_MAX
+    ? collapsed
+    : collapsed.slice(0, SESSION_LIST_PREVIEW_MAX)
+}
+
 /** Advance the Session-list hint projection by one committed event. */
 function applySessionListMetadata(state: SessionListMetadata, event: SessionEvent): SessionListMetadata {
   const blank = state.blank && event.type !== 'turn/start'
-  const lastPromptAt = event.type === 'user/message' && event.data.source.kind === 'user'
-    ? event.time
-    : state.lastPromptAt
-  return blank === state.blank && lastPromptAt === state.lastPromptAt
+  const isPrompt = event.type === 'user/message' && event.data.source.kind === 'user'
+  const lastPromptAt = isPrompt ? event.time : state.lastPromptAt
+  const lastPromptText = isPrompt ? promptPreviewText(event) : state.lastPromptText
+  return blank === state.blank && lastPromptAt === state.lastPromptAt && lastPromptText === state.lastPromptText
     ? state
-    : { blank, lastPromptAt }
+    : { blank, lastPromptAt, lastPromptText }
 }
 
 /** Fold exact list metadata for an attached Session. */
 function sessionListMetadata(events: readonly SessionEvent[]): SessionListMetadata {
-  let state: SessionListMetadata = { blank: true, lastPromptAt: null }
+  let state: SessionListMetadata = { blank: true, lastPromptAt: null, lastPromptText: null }
   for (const event of events) state = applySessionListMetadata(state, event)
   return state
 }
@@ -504,36 +526,63 @@ function summarize(session: Session, running: boolean): SessionSummary {
 }
 
 /**
+ * One fold result remembered against the artifact's stat identity: a cold
+ * log only changes through an attach flush, which moves its mtime, so an
+ * unchanged (mtimeMs, size) pair still describes the same events. Listing
+ * re-probes every eligible artifact otherwise, re-decompressing whole logs
+ * on each sidebar refresh.
+ */
+interface ColdProbeMemoEntry {
+  mtimeMs: number
+  size: number
+  result: { metadata: SessionListMetadata; asOfSeq: number }
+}
+
+/**
  * Verify a possibly blank cold Session only when its physical artifact passes
  * the configured per-Session size check. A stale `blank: true`, an
  * absent cache row, a large or location-less artifact, and read failures all
  * resolve to visible (`false`); listing must never hide a conversation on a
- * cache hint or an unavailable optimization.
+ * cache hint or an unavailable optimization. The returned `asOfSeq` is the
+ * last read event's seq (-1 for an empty log), block vocabulary, so the fold
+ * can stand in for a missing or stale projection cache row. Successful folds
+ * land in `memo` under the artifact's stat identity, so repeated listings
+ * skip the read while the file is unchanged.
  */
 async function probeColdSessionMetadata(
   ctx: Context,
   persistence: SessionPersistence,
   meta: SessionHeader,
   maxBytes: number,
+  memo: Map<SessionId, ColdProbeMemoEntry>,
   signal?: AbortSignal,
-): Promise<SessionListMetadata | undefined> {
+): Promise<{ metadata: SessionListMetadata; asOfSeq: number } | undefined> {
   if (maxBytes === 0) return undefined
   signal?.throwIfAborted()
   const location = persistence.locate(meta)
   if (location === undefined) return undefined
   signal?.throwIfAborted()
+  let mtimeMs: number
   let size: number
   try {
-    size = (await stat(location.path)).size
+    const stats = await stat(location.path)
+    mtimeMs = stats.mtimeMs
+    size = stats.size
   } catch {
     signal?.throwIfAborted()
     return undefined
   }
   if (size > maxBytes) return undefined
+  const remembered = memo.get(meta.id)
+  if (remembered !== undefined && remembered.mtimeMs === mtimeMs && remembered.size === size) return remembered.result
   try {
     const { events } = await persistence.readFrom(meta.id, 0, signal)
     signal?.throwIfAborted()
-    return sessionListMetadata(events)
+    const lastEvent = events.at(-1)
+    const lastSeq = lastEvent === undefined ? -1 : lastEvent.seq
+    const result = { metadata: sessionListMetadata(events), asOfSeq: lastSeq }
+    memo.set(meta.id, { mtimeMs, size, result })
+    return result
   } catch (error) {
     signal?.throwIfAborted()
     ctx.logger.warn(`session.list: blank probe for "${meta.id}" failed (serving it as visible): ${String(error)}`)
@@ -541,23 +590,17 @@ async function probeColdSessionMetadata(
   }
 }
 
-/** SessionSummary projection for a cold persisted Session. */
-async function summarizeCold(
-  ctx: Context,
-  persistence: SessionPersistence,
+/** SessionSummary projection for a cold persisted Session with resolved metadata. */
+function summarizeCold(
   meta: SessionHeader,
-  metadata: SessionListMetadata | undefined,
-  blankProbeMaxBytes: number,
-  signal?: AbortSignal,
-): Promise<SessionSummary> {
-  const probed = metadata?.blank === false
-    ? undefined
-    : await probeColdSessionMetadata(ctx, persistence, meta, blankProbeMaxBytes, signal)
+  cachedMetadata: SessionListMetadata | undefined,
+  probedMetadata: SessionListMetadata | undefined,
+): SessionSummary {
   return {
     sessionId: meta.id,
-    updatedAt: sessionListUpdatedAt(meta, probed ?? metadata),
+    updatedAt: sessionListUpdatedAt(meta, probedMetadata ?? cachedMetadata),
     running: false,
-    blank: metadata?.blank === false ? false : probed?.blank ?? false,
+    blank: cachedMetadata?.blank === false ? false : probedMetadata?.blank ?? false,
     // Header-only: reading the log for a blank-window preset switch would
     // defeat the same index read, and attaching the session replaces this row
     // with `summarize()`, which resolves the switch from the events.
@@ -1049,6 +1092,8 @@ export function createApiProxy(ctx: Context, defaults: ApiProxyDefaults): ApiPro
     ?? DEFAULT_SESSION_LOG_COMPRESSION_LEVEL
   const coldBlankProbeMaxBytes = defaults.coldBlankProbeMaxBytes
     ?? DEFAULT_COLD_BLANK_PROBE_MAX_BYTES
+  /** Successful cold folds per process, keyed by the artifact's stat identity. */
+  const coldProbeMemo = new Map<SessionId, ColdProbeMemoEntry>()
   /** The seed model each create/resume declares; re-read so it never goes stale. */
   const agentOptions = (): AgentOptions => {
     const { provider, model } = defaults.defaultModelSelection()
@@ -1233,10 +1278,10 @@ export function createApiProxy(ctx: Context, defaults: ApiProxyDefaults): ApiPro
     projectionCtx.sessionProjections.register<'sessionListMetadata', SessionListMetadata>({
       key: 'sessionListMetadata',
       stateSchema: sessionListMetadataProjectionSchema,
-      init: () => ({ blank: true, lastPromptAt: null }),
+      init: () => ({ blank: true, lastPromptAt: null, lastPromptText: null }),
       apply: applySessionListMetadata,
       wire: { viewSchema: sessionListMetadataProjectionSchema, view: state => state },
-      stateVersion: 1,
+      stateVersion: 2,
     })
   })
 
@@ -1689,19 +1734,29 @@ export function createApiProxy(ctx: Context, defaults: ApiProxyDefaults): ApiPro
             // Projection hints remain optional. Blank verification may read
             // this Session's artifact only when it passes the configured size check.
             const projections = listProjectionsFor(ctx, meta, undefined)
-            const summary = await summarizeCold(
-              ctx,
-              persistence,
-              meta,
-              projections?.values.sessionListMetadata,
-              coldBlankProbeMaxBytes,
-              signal,
-            )
+            const cachedMetadata = projections?.values.sessionListMetadata
+            const probed = cachedMetadata?.blank === false
+              ? undefined
+              : await probeColdSessionMetadata(ctx, persistence, meta, coldBlankProbeMaxBytes, coldProbeMemo, signal)
+            const summary = summarizeCold(meta, cachedMetadata, probed?.metadata)
             const attachedSession = ctx.sessions.get(meta.id)
             if (attachedSession !== undefined) return summarizeAttached(attachedSession)
+            // The probe read the whole log to verify a possibly-blank row;
+            // the same fold repairs the sessionListMetadata a stale or
+            // version-dropped cache row cannot carry, so the list preview
+            // does not wait on the next attach. It merges into the cached
+            // block under the lower watermark: under-claiming is safe under
+            // the client's higher-seq-wins seeding, and a cached row keeps
+            // its other units.
+            const block = probed === undefined
+              ? projections
+              : {
+                asOfSeq: projections === undefined ? probed.asOfSeq : Math.min(projections.asOfSeq, probed.asOfSeq),
+                values: { ...projections?.values, sessionListMetadata: probed.metadata },
+              }
             return {
               ...summary,
-              ...projections === undefined ? {} : { projections },
+              ...block === undefined ? {} : { projections: block },
             }
           }),
         )

@@ -1,0 +1,40 @@
+/* Liquid fill ported from animate-ui's LiquidButton: a 200%-wide gradient
+   sheet parks off-canvas right (`--liquid-fill-width: -1%` leaves nothing
+   visible); hover snaps the custom properties (fills read full height at
+   once) and the listed transitions sweep `background-position` across, so
+   the fill pours left-to-right. The leave transition delays by
+   `--liquid-delay` while the hover one does not, producing the linger-then-
+   recede read. Scale replaces the original motion spring with one curve.
+   Longhands, not the `background` shorthand: consumers style the button's
+   resting surface with `background-color`, which the shorthand would reset. */
+
+.liquid {
+  --liquid-fill-width: -1%;
+  overflow: hidden;
+  background-image: linear-gradient(var(--dsw-alias-button-floating-hover) 0 0);
+  background-repeat: no-repeat;
+  background-position: calc(200% - var(--liquid-fill-width)) 100%;
+  background-size: 200% var(--liquid-fill-height, 3px);
+  transition:
+    transform 260ms cubic-bezier(0.34, 1.56, 0.64, 1),
+    background-position 300ms ease var(--liquid-delay, 0.3s);
+}
+
+.liquid:hover {
+  --liquid-fill-width: 100%;
+  transform: scale(var(--liquid-hover-scale, 1.05));
+  transition-delay: 0s, 0s;
+}
+
+.liquid:active {
+  transform: scale(var(--liquid-tap-scale, 0.95));
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .liquid,
+  .liquid:hover,
+  .liquid:active {
+    transition: none;
+    transform: none;
+  }
+}

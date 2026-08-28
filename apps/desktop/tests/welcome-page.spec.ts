@@ -11,7 +11,7 @@ describe('desktop welcome page', () => {
 
     expect(html).toContain('探索未至之境')
     expect(html).toContain('<title>DSH</title>')
-    expect(html).toContain('<h2>DSH</h2>')
+    expect(html).toContain('<h2 class="join-title">DSH<br>共赴智能新境</h2>')
     expect(html).not.toContain('DSH Desktop')
     expect(html).toContain('id="startup-status"')
     expect(html).toContain('id="startup-detail"')

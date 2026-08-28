@@ -508,6 +508,8 @@ export interface ConversationSessionHeaderInjected {
   }
   /** Select a real Session through the runtime navigation owner. */
   open: (sessionId: SessionId) => void
+  /** Rename the current Session through the runtime session face; rejects on wire failure. */
+  rename: (sessionId: SessionId, title: string) => Promise<void>
 }
 
 /**

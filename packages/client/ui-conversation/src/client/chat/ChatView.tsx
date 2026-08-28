@@ -23,6 +23,15 @@ import { formatRunDuration } from './message-chrome.ts'
 import css from './ChatView.module.css'
 
 const FOLLOW_THRESHOLD = 24
+/** Glide timing: a per-pixel cost bounded by a min/max duration. */
+const BOTTOM_GLIDE_MIN_MS = 240
+const BOTTOM_GLIDE_MAX_MS = 480
+const BOTTOM_GLIDE_MS_PER_PX = 0.12
+
+/** Ease-out cubic: the glide launches fast and lands soft. */
+function easeOutCubic(progress: number): number {
+  return 1 - (1 - progress) ** 3
+}
 
 /** Active column host when present; otherwise the view-local scroller. */
 function scrollerOf(from: HTMLElement): HTMLElement {
@@ -242,12 +251,61 @@ export function ChatView({
   const followSig = `${openState}:${firstSeq}:${lastKey}:${order.length}:${running ? 1 : 0}:${lastSteeringId ?? ''}`
 
   const toBottom = (el: HTMLElement): void => {
+    stopBottomGlide()
     anchorRef.current = null
     el.scrollTop = el.scrollHeight
     observedTopRef.current = el.scrollTop
     atBottomRef.current = true
     setAtBottom(true)
     chatScroll.save(null)
+  }
+
+  /** The in-flight bottom glide's rAF handle; null while no glide runs. */
+  const bottomGlideRef = useRef<number | null>(null)
+
+  const stopBottomGlide = (): void => {
+    if (bottomGlideRef.current !== null) {
+      cancelAnimationFrame(bottomGlideRef.current)
+      bottomGlideRef.current = null
+    }
+  }
+
+  /**
+   * Reach the bottom like toBottom, but cover a distance beyond one viewport
+   * with an eased glide instead of a teleport: the visual ride is animated
+   * while ownership, the ledger, and the saved position settle exactly as the
+   * instant jump does. Short moves, reduced motion, and a missing rAF keep the
+   * instant write. Content growing mid-glide retargets the remaining ride from
+   * the live floor, so the follow strategy stays the fast one.
+   */
+  const jumpToBottom = (el: HTMLElement): void => {
+    const floor = Math.max(0, el.scrollHeight - el.clientHeight)
+    const distance = floor - el.scrollTop
+    const reducedMotion = typeof window.matchMedia === 'function'
+      && window.matchMedia('(prefers-reduced-motion: reduce)').matches
+    if (distance <= el.clientHeight || reducedMotion || typeof requestAnimationFrame !== 'function') {
+      toBottom(el)
+      return
+    }
+    anchorRef.current = null
+    atBottomRef.current = true
+    setAtBottom(true)
+    chatScroll.save(null)
+    stopBottomGlide()
+    const from = el.scrollTop
+    const duration = Math.min(BOTTOM_GLIDE_MAX_MS, Math.max(BOTTOM_GLIDE_MIN_MS, distance * BOTTOM_GLIDE_MS_PER_PX))
+    let started: number | null = null
+    const step = (now: number): void => {
+      // The rAF timestamp, not an external clock, is the glide's time base: the
+      // frame clock is only comparable to itself across engines.
+      started ??= now
+      const target = Math.max(0, el.scrollHeight - el.clientHeight)
+      const progress = Math.min(1, (now - started) / duration)
+      el.scrollTop = from + (target - from) * easeOutCubic(progress)
+      observedTopRef.current = el.scrollTop
+      bottomGlideRef.current = progress < 1 ? requestAnimationFrame(step) : null
+    }
+    bottomGlideRef.current = requestAnimationFrame(step)
   }
 
   useLayoutEffect(() => {
@@ -308,7 +366,8 @@ export function ChatView({
     followSigRef.current = followSig
     // Follow new flow content while pinned; do NOT re-pin on every render
     // merely because atBottomRef is true (scroll threshold → setState → snap).
-    if (appendedUser || appendedSteering || (tipMoved && atBottomRef.current)) toBottom(el)
+    if (appendedUser || appendedSteering) toBottom(el)
+    else if (tipMoved && atBottomRef.current) jumpToBottom(el)
   })
 
   const onScrollRef = useRef(() => {})
@@ -326,11 +385,16 @@ export function ChatView({
     // the current ownership state.
     const floor = Math.max(0, el.scrollHeight - el.clientHeight)
     const movedByReader = Math.abs(el.scrollTop - Math.min(observedTopRef.current, floor)) > 0.5
+    // Reader input takes over a running glide: the ride must not keep writing
+    // over the position the reader just chose.
+    if (movedByReader) stopBottomGlide()
     const isAtBottom = movedByReader
       ? floor - el.scrollTop <= FOLLOW_THRESHOLD + 1
       : atBottomRef.current
     if (!movedByReader && isAtBottom) {
-      toBottom(el)
+      // A running glide already owns the ride to the floor; snapping here
+      // would teleport its remaining distance in one frame.
+      if (bottomGlideRef.current === null) toBottom(el)
       return
     }
     atBottomRef.current = isAtBottom
@@ -360,6 +424,8 @@ export function ChatView({
     el.addEventListener('scroll', onScroll, { passive: true })
     return () => {
       el.removeEventListener('scroll', onScroll)
+      // An in-flight glide must not keep writing after the view is gone.
+      if (bottomGlideRef.current !== null) cancelAnimationFrame(bottomGlideRef.current)
     }
   }, [])
 
@@ -367,6 +433,9 @@ export function ChatView({
   // initializer a function initial value would need never exists.
   const followRef = useRef<(() => void) | null>(null)
   followRef.current = () => {
+    // A running glide retargets growth on its own frames; an instant follow
+    // write here would snap the ride the glide is still animating.
+    if (bottomGlideRef.current !== null) return
     const local = listRef.current
     if (local !== null && atBottomRef.current) {
       const el = scrollerOf(local)
@@ -469,7 +538,7 @@ export function ChatView({
               onClick={() => {
                 const local = listRef.current
                 /* v8 ignore next -- ref-null guard: the button only renders alongside the mounted list. */
-                if (local !== null) toBottom(scrollerOf(local))
+                if (local !== null) jumpToBottom(scrollerOf(local))
               }}
             >
               <IconChevronDownOutline14 />

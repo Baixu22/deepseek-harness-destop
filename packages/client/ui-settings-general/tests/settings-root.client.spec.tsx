@@ -1,9 +1,21 @@
 // @vitest-environment jsdom
 import { afterEach, describe, expect, it, vi } from 'vitest'
-import { useEffect, useState } from 'react'
+import { useEffect, useState, type ReactNode } from 'react'
 import { act, cleanup, fireEvent, render, screen } from '@testing-library/react'
 import type { SettingsRootComponentProps } from '../src/client/shell-contract.ts'
 import { SettingsRoot } from '../src/client/SettingsRoot.tsx'
+
+// jsdom has no WAAPI or paint loop, so motion's exit animations never
+// advance and AnimatePresence would hold its children forever. Pass the
+// children straight through: the close-path tests then see the production
+// contract (state retires, panel unmounts) without the browser-only hold.
+vi.mock('motion/react', async (importOriginal) => {
+  const actual = await importOriginal<typeof import('motion/react')>()
+  return {
+    ...actual,
+    AnimatePresence: ({ children }: { children?: ReactNode }) => children ?? null,
+  }
+})
 
 afterEach(cleanup)
 
@@ -126,6 +138,10 @@ describe('SettingsPanel chrome seats', () => {
 })
 
 describe('SettingsPanel close paths', () => {
+  // Close holds the panel through its exit in the browser (the
+  // AnimatePresence-held morph back into the trigger); the pass-through
+  // mock above removes the browser-only hold, so removal is synchronous
+  // here and pins the production contract the exit ends with.
   it('closes via the header button', () => {
     mount()
     openPanel()

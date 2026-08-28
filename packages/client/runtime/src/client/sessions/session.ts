@@ -70,6 +70,8 @@ export class Session implements SessionFace {
   private views: (ToolEventView | undefined)[] = []
   private baseSeq = 0
   private hasMore = false
+  /** user/message data.ids already handed to the assembler (see projectedEntries). */
+  private readonly projectedMessageIds = new Set<string>()
   private openState: OpenState = 'cold'
   private openError: RpcError | null = null
   private openPromise: Promise<void> | null = null
@@ -404,7 +406,7 @@ export class Session implements SessionFace {
       /* v8 ignore next -- the ?? arm needs older[0] undefined, but the empty-page branch above already returned. */
       this.baseSeq = older[0]?.event.seq ?? this.baseSeq
       this.hasMore = result.value.hasMore
-      this.conversation.prepend(older.map(conversationInput), this.hasMore)
+      this.conversation.prepend(this.projectedEntries(older).map(conversationInput), this.hasMore)
     } catch (error) {
       console.error('[web-runtime] loadOlder failed:', error)
     } finally {
@@ -660,7 +662,8 @@ export class Session implements SessionFace {
     this.baseSeq = this.events[0]?.seq ?? 0
     this.hasMore = hasMore
     if (this.events.some(event => event.type === 'turn/start')) this.firstPromptPendingTurn = false
-    this.conversation.replaceWindow(entries.map(conversationInput), hasMore)
+    this.projectedMessageIds.clear()
+    this.conversation.replaceWindow(this.projectedEntries(entries).map(conversationInput), hasMore)
     if (projections !== undefined) this.projections.seed(projections)
     const buffered = this.liveBuffer
     this.liveBuffer = []
@@ -676,7 +679,12 @@ export class Session implements SessionFace {
     this.views.push(view)
     if (event.type === 'turn/start') this.firstPromptPendingTurn = false
     const queueChanged = this.queueMirror.acceptDurable(event)
-    const publication = this.conversation.append({ event, view })
+    // A repeated injected message id keeps its raw window slot but never
+    // reaches the assembler twice (see projectedEntries).
+    const messageId = messageIdOf(event)
+    const duplicateProjection = messageId !== null && this.projectedMessageIds.has(messageId)
+    if (messageId !== null) this.projectedMessageIds.add(messageId)
+    const publication = duplicateProjection ? 'none' : this.conversation.append({ event, view })
     return queueChanged ? 'immediate' : publication
   }
 
@@ -730,6 +738,37 @@ export class Session implements SessionFace {
   private windowTailSeq(): number | null {
     const tail = this.events[this.events.length - 1]
     return tail === undefined ? null : tail.seq
+  }
+
+  /**
+   * Filter a history slice down to what the assembler may accept: legacy host
+   * builds logged session-scoped injection hints (e.g.
+   * `instruction-hint-session-<id>`) under one deterministic user/message id,
+   * so a window spanning two injections carries id repeats, and the assembler
+   * admits one start per Context id. The raw window keeps every event — the
+   * drop is projection-only and keeps each id's highest-seq occurrence.
+   * @param entries - ascending history slice.
+   * @returns the slice safe to hand to the assembler; kept ids are remembered.
+   */
+  private projectedEntries(entries: readonly HistoryEntry[]): HistoryEntry[] {
+    const lastKeepIndex = new Map<string, number>()
+    entries.forEach((entry, index) => {
+      const id = messageIdOf(entry.event)
+      if (id !== null && !this.projectedMessageIds.has(id)) lastKeepIndex.set(id, index)
+    })
+    const kept: HistoryEntry[] = []
+    entries.forEach((entry, index) => {
+      const id = messageIdOf(entry.event)
+      if (id === null) {
+        kept.push(entry)
+        return
+      }
+      if (this.projectedMessageIds.has(id)) return
+      if (lastKeepIndex.get(id) !== index) return
+      this.projectedMessageIds.add(id)
+      kept.push(entry)
+    })
+    return kept
   }
 
   private buildSnapshot(): ConversationSnapshot {
@@ -786,6 +825,11 @@ export class Session implements SessionFace {
 /** Convert one wire history row into the assembler's transport-neutral input. */
 function conversationInput(entry: HistoryEntry): ConversationEventInput {
   return { event: entry.event, view: entry.view }
+}
+
+/** user/message data.id; null for every other event type. */
+function messageIdOf(event: SessionEvent): string | null {
+  return event.type === 'user/message' ? String(event.data.id) : null
 }
 
 /** A generic command row alone remains control-plane content; every other visible Chat Node activates the conversation. */

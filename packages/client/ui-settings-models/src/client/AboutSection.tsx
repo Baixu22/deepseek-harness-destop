@@ -8,7 +8,8 @@
 
 import { useEffect, useState } from 'react'
 import type { ReactNode } from 'react'
-import { FishLogo } from '@deepseek-ai/dsh-client-ui-primitives'
+import { FishLogo, HoverCard } from '@deepseek-ai/dsh-client-ui-primitives'
+import { IconCloud } from './IconCloud.tsx'
 import styles from './ModelsSection.module.css'
 
 /** The subset of the Electron preload bridge this page reads. */
@@ -33,13 +34,47 @@ export type AboutKey =
   | 'aboutNav' | 'aboutTagline' | 'aboutVersion' | 'aboutRuntime'
   | 'aboutRepo' | 'aboutCheckNow' | 'aboutChecking' | 'aboutUpToDate'
   | 'aboutDownloading' | 'aboutInstall' | 'aboutInstalling' | 'aboutError'
+  | 'aboutCopy' | 'aboutCopied' | 'aboutRepoHint'
   | 'aboutFoot'
+
+/**
+ * Live page screenshot of the repository home, delivered by the mshots
+ * snapshot service as a pure enhancement: the card's text renders at once,
+ * the shot fades in only if the service delivers, and a failure just drops
+ * the image — the network can no longer take the URL reveal down with it
+ * (the reason the previous microlink card was removed).
+ * @param props.url - page URL to screenshot.
+ * @returns the screenshot image, or nothing once the load has failed.
+ */
+function RepoShot({ url }: { url: string }) {
+  const [state, setState] = useState<'loading' | 'ok' | 'failed'>('loading')
+  if (state === 'failed') return null
+  return (
+    <img
+      className={state === 'ok'
+        ? `${styles['aboutRepoCardShot']} ${styles['aboutRepoCardShotOk']}`
+        : styles['aboutRepoCardShot']}
+      src={`https://s.wordpress.com/mshots/v1/${encodeURIComponent(url)}?w=480`}
+      alt=""
+      onLoad={() => { setState('ok') }}
+      onError={() => { setState('failed') }}
+    />
+  )
+}
 
 /** Props of {@link AboutSection}. */
 export interface AboutSectionProps {
   /** Bound translate of the models namespace (shares its copy seats). */
   t: (key: AboutKey) => string
 }
+
+/** simple-icons slugs orbiting the About sphere (magicui demo roster). */
+const ABOUT_ICON_SLUGS = [
+  'typescript', 'javascript', 'dart', 'java', 'react', 'flutter', 'android', 'html5',
+  'css3', 'nodedotjs', 'express', 'nextdotjs', 'prisma', 'amazonaws', 'postgresql',
+  'firebase', 'nginx', 'vercel', 'testinglibrary', 'jest', 'cypress', 'docker', 'git',
+  'jira', 'github', 'gitlab', 'visualstudiocode', 'androidstudio', 'sonarqube', 'figma',
+] as const
 
 const REPOSITORY = 'https://github.com/Baixu22/deepseek-harness-destop'
 
@@ -57,7 +92,7 @@ export function AboutSection({ t }: AboutSectionProps): ReactNode {
     if (bridge === undefined || bridge.getUpdateState === undefined) return
     void bridge.getUpdateState().then(setState).catch(() => undefined)
     if (bridge.onUpdateState === undefined) return
-    return bridge.onUpdateState(next => setState(next))
+    return bridge.onUpdateState((next) => { setState(next) })
   }, [bridge])
 
   const statusLabel = (): string => {
@@ -99,7 +134,25 @@ export function AboutSection({ t }: AboutSectionProps): ReactNode {
           : null}
         <div className={styles['aboutRow']}>
           <span className={styles['aboutKey']}>{t('aboutRepo')}</span>
-          <a className={styles['aboutLink']} href={REPOSITORY} target="_blank" rel="noopener noreferrer">{REPOSITORY.replace('https://', '')}</a>
+          {/* Address card with a live page preview: the text is local and
+              immediate; the screenshot is a best-effort enhancement. */}
+          <HoverCard
+            side="bottom"
+            openDelayMs={350}
+            copyText={REPOSITORY}
+            copyLabel={t('aboutCopy')}
+            copiedLabel={t('aboutCopied')}
+            anchor={(
+              <a className={styles['aboutLink']} href={REPOSITORY} target="_blank" rel="noopener noreferrer">{REPOSITORY.replace('https://', '')}</a>
+            )}
+            content={(
+              <div className={styles['aboutRepoCard']}>
+                <RepoShot url={REPOSITORY} />
+                <span className={styles['aboutRepoCardUrl']}>{REPOSITORY}</span>
+                <span className={styles['aboutRepoCardHint']}>{t('aboutRepoHint')}</span>
+              </div>
+            )}
+          />
         </div>
         {checkForUpdates !== undefined
           ? (
@@ -121,6 +174,8 @@ export function AboutSection({ t }: AboutSectionProps): ReactNode {
           : null}
       </div>
       <p className={styles['aboutFoot']}>{t('aboutFoot')}</p>
+      {/* Orbiting product glyph set (magicui IconCloud port). */}
+      <IconCloud slugs={ABOUT_ICON_SLUGS} />
     </div>
   )
 }

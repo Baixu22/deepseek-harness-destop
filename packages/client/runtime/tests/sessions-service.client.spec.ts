@@ -350,6 +350,32 @@ describe('cell (render-layer session kit)', () => {
       vi.unstubAllGlobals()
     }
   })
+
+  it('startup restore survives the pre-list projection: pending never wipes the persisted selection', async () => {
+    const storage = new Map<string, string>([
+      ['dsh.sessions.current', JSON.stringify({ sessionId: 's1' })],
+    ])
+    vi.stubGlobal('localStorage', {
+      getItem: (k: string) => storage.get(k) ?? null,
+      setItem: (k: string, v: string) => { storage.set(k, v) },
+    })
+    try {
+      const b = bench()
+      // The connect-driven refresh marks the list dirty before its pull
+      // resolves: that pending projection must not erase the selection.
+      const pull = deferred<{ items: never[] }>()
+      b.api.onList = () => pull.promise as never
+      b.svc.handleConnected()
+      await Promise.resolve() // manager notifier flush (pending, empty list)
+      expect(storage.get('dsh.sessions.current')).toContain('s1')
+      pull.resolve(ok({ items: [{ sessionId: sid('s1'), updatedAt: 1, running: false, blank: false }] }) as never)
+      await Promise.resolve()
+      await Promise.resolve()
+      expect(b.svc.list.getSnapshot().current).toBe('s1')
+    } finally {
+      vi.unstubAllGlobals()
+    }
+  })
 })
 
 describe('slot-store scope prune hook', () => {

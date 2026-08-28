@@ -6,7 +6,7 @@
 
 ## 安装与启动
 
-从本仓库的 [Releases 页面](https://github.com/Baixu22/deepseek-harness-destop/releases)下载 `DSH-Windows-x64-Setup-<version>.exe`。安装包及其差分更新 blockmap 的文件名都会包含 `Windows-x64`，明确标注支持的平台和架构。NSIS 安装程序支持自定义安装目录，并创建名为 **DSH** 的桌面与开始菜单快捷方式。
+从本仓库的 [Releases 页面](https://github.com/luo-ross/dsh-desktop/releases)下载 `DSH-Windows-x64-Setup-<version>.exe`。安装包及其差分更新 blockmap 的文件名都会包含 `Windows-x64`，明确标注支持的平台和架构。NSIS 安装程序支持自定义安装目录，并创建名为 **DSH** 的桌面与开始菜单快捷方式。
 
 当前构建尚未进行代码签名。接受 Windows SmartScreen 的未知发布者提示前，请核对发行页面公布的 SHA-256。首次启动可能需要约一分钟，因为应用必须先展开随安装包分发的后端。解压在子进程中执行；采用 DeepSeek 官网视觉语言且保持响应的欢迎页会分别显示解压、后端启动和连接阶段，后端能够接受 HTTP 请求后自动进入主窗口。
 
@@ -16,7 +16,7 @@
 
 ## 配置模型与工作区
 
-首次运行页面会说明 DSH 是 DeepSeek Harness 的简称，并标明 DSH 是非官方社区桌面版。继续进入**设置 → 模型**后，可以保存 DeepSeek API Key 或其他受支持的模型提供方；DeepSeek 编辑器会直接链接到官方 API Key 页面。开始会话前，请从侧边栏添加或选择工作区。新增工作区使用 Electron 的 Windows 原生文件夹对话框，并默认从用户的“文档”目录开始选择。
+首次运行页面会说明 DSH 是 DeepSeek Harness 的简称，并标明 DSH 是非官方社区桌面版。继续进入 **设置 → 模型** 后，可以保存 DeepSeek API Key 或其他受支持的模型提供方；DeepSeek 编辑器会直接链接到官方 API Key 页面。开始会话前，请从侧边栏添加或选择工作区。新增工作区使用 Electron 的 Windows 原生文件夹对话框，并默认从用户的“文档”目录开始选择。
 
 渲染器就是上游 Harness UI，因此模型设置、权限预设、工具、会话、附件、插件和模型提供方行为保持不变。受 Codex 启发的桌面样式表只改变界面表现；Electron 负责无原生标题栏的沉浸式 Windows 窗口、应用内窗口控件和桌面目录选择桥接。
 
@@ -30,25 +30,25 @@ Harness 状态优先使用 `DSH_HOME`，未设置时使用 `~/.dsh`。该目录�
 
 ## 开发运行
 
-安装仓库所需环境并执行 `pnpm install`，然后在仓库根目录运行 `pnpm run desktop:dev`。该命令会先构建 Harness，再启动 Electron。开发模式使用检出目录中已经构建的 CLI，不使用安装包后端归档。
+安装仓库所需环境并执行 `pnpm install`，然后在仓库根目录运行 `pnpm run desktop:dev`。该命令会先构建 Harness，再启动 Electron。开发模式使用检出目录中已经构建的 CLI，不使用安装包内置的后端运行时。
 
 ## 构建 Windows 安装程序
 
 在仓库根目录运行 `pnpm run desktop:pack`。构建过程依次执行：
 
-1. 构建 Harness Host 和 Web UI。
+1. 构建 Harness Host 与 Web UI。
 2. 使用 hoisted node linker 部署 `@deepseek-ai/dsh` 的生产依赖闭包和仓库规范的运行时 peer 根依赖，并拒绝缺少任何必要运行文件的部署。
 3. 把刚构建的 Web 前端和桌面版修改过的客户端插件 bundle 覆盖到部署后端中，使渲染器改动与固定的运行时依赖闭包一同交付。
-4. 创建 `desktop-backend.tar.gz`，确保 Electron Builder 打包后仍保留嵌套依赖和原生文件。
+4. 部署目录保持不压缩：打包钩子把它复制进应用资源目录，NSIS 安装程序在安装时展开，应用启动不再承担解压耗时。
 5. 在 `dist-desktop/` 中生成 x64 免安装目录、NSIS 安装程序、`latest.yml` 和差分下载 blockmap。
 
-生成的部署目录、归档、免安装应用、安装程序、更新元数据和 blockmap 均由 Git 忽略。每个 GitHub 发行版必须同时上传安装程序、`latest.yml` 和匹配的 blockmap；客户端会在安装前校验元数据中的校验值。发行版二进制文件不提交到源码树。
+生成的部署目录、免安装应用、安装程序、更新元数据和 blockmap 均由 Git 忽略。每个 GitHub 发行版必须同时上传安装程序、`latest.yml` 和匹配的 blockmap；客户端会在安装前校验元数据中的校验值。发行版二进制文件不提交到源码树。
 
 ## 故障排查
 
-**首次启动看起来很慢。** 请等待准备页面结束。杀毒软件扫描和后端解压可能使首次启动明显慢于后续启动。
+**首次启动看起来很慢。** 请等待准备页面结束。常见原因是杀毒软件扫描；后端运行时由安装程序在安装期展开，不在启动时解压。
 
-**启动时提示模块缺失或后端不完整。** 请安装最新发行版。正确打包的版本会携带 `backend.tar.gz`，并自动替换未完整解压的版本目录。
+**启动时提示模块缺失或后端不完整。** 请安装最新发行版；后端运行时随安装程序交付，在安装期展开。
 
 **应用提示 HTTP 超时或连接被重置。** 关闭 DSH，确认没有旧的 DSH 进程残留，然后重新启动。提交可复现问题时，请保留完整错误信息。
 
@@ -68,4 +68,4 @@ Harness 状态优先使用 `DSH_HOME`，未设置时使用 `~/.dsh`。该目录�
 
 ## 归属说明
 
-窗口、可执行文件、安装程序和 Windows 快捷方式使用由 `apps/web/public/favicon.svg` 中 DeepSeek 官方鲸鱼标志生成的 ICO。DSH 是非官方社区构建，未获得 DeepSeek AI 背书。源码采用仓库根目录中的 MIT 许可证，并保留根目录的第三方声明。
+窗口、可执行文件、安装程序和 Windows 快捷方式使用由 `apps/web/public/favicon.svg` 的 DeepSeek 官方鲸鱼标志生成的 ICO。DSH 是非官方社区构建，未获得 DeepSeek AI 背书。源码采用仓库根目录中的 MIT 许可证，并保留根目录的第三方声明。

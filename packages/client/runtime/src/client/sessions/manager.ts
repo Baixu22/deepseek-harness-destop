@@ -133,6 +133,9 @@ export class SessionManager {
   private listPhase: SessionListPhase = 'pending'
   private listError: RpcError | null = null
   private listInflight: Promise<void> | null = null
+  /** Backoff state for failed baseline pulls; a successful pull resets it. */
+  private listRetryAttempts = 0
+  private listRetryTimer: ReturnType<typeof setTimeout> | null = null
   /** Mutations arriving after a list request starts are replayed over its response. */
   private listMutations: SessionListMutation[] | null = null
   private readonly addresses = new Map<SessionId, SubagentAddress>()
@@ -437,6 +440,10 @@ export class SessionManager {
 
   /** Full refresh via session.list (single-flight: an in-flight call is reused). */
   refreshList(): Promise<void> {
+    if (this.listRetryTimer !== null) {
+      clearTimeout(this.listRetryTimer)
+      this.listRetryTimer = null
+    }
     if (this.listInflight !== null) return this.listInflight
     this.listState = 'loading'
     this.listError = null
@@ -468,6 +475,7 @@ export class SessionManager {
           this.summaries = summaries
           this.listState = 'idle'
           this.listPhase = 'ready'
+          this.listRetryAttempts = 0
           // Covers the empty-mutations pull (a plain baseline carries no edge).
           this.syncCompletedNotifications()
           // Push running/blank bits down to instantiated Sessions (the list is the authoritative summary source).
@@ -493,12 +501,14 @@ export class SessionManager {
         } else {
           this.listState = 'error'
           this.listError = result.error
+          this.scheduleListRetry()
         }
       } catch (error) {
         this.listState = 'error'
         const folded = transportError<never>(error)
         /* v8 ignore next -- the `? null` arm is unreachable: transportError always returns ok:false. */
         this.listError = folded.ok ? null : folded.error
+        this.scheduleListRetry()
       } finally {
         this.listMutations = null
         this.listInflight = null
@@ -506,6 +516,22 @@ export class SessionManager {
       }
     })()
     return this.listInflight
+  }
+
+  /**
+   * Re-pull after a failed baseline: on a cold host the very first pull can
+   * fail (route not registered yet, aborted ahead of store hydration) and no
+   * later event re-triggers it — without a retry the startup-restore
+   * selection sits in the pending phase forever. Bounded exponential backoff.
+   */
+  private scheduleListRetry(): void {
+    if (this.listRetryAttempts >= 6) return
+    const delay = Math.min(1000 * 2 ** this.listRetryAttempts, 15000)
+    this.listRetryAttempts += 1
+    this.listRetryTimer = setTimeout(() => {
+      this.listRetryTimer = null
+      void this.refreshList()
+    }, delay)
   }
 
   /**

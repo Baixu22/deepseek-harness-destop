@@ -59,6 +59,7 @@ export function ContextInjectionRow({ content, source, provenance, form, t }: Co
         </>
       )}
       keepContentWhenOpen
+      morphBody
       open={open}
       expandable
       expandOnRowClick

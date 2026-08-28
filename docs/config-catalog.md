@@ -816,8 +816,9 @@ export interface Config {
   sessionExportCompressionLevel?: 0 | 1 | 2 | 3 | 4 | 5 | 6 | 7 | 8 | 9
   /**
    * Maximum physical size of a cold Session artifact eligible for blankness
-   * verification. Zero disables probes.
-   * @default 1024
+   * verification. The same probe repairs a missing projection cache row and
+   * therefore carries the list preview. Zero disables probes.
+   * @default 16777216
    */
   coldBlankProbeMaxBytes?: number
 }

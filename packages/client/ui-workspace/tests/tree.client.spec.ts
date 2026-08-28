@@ -3,7 +3,7 @@ import type {
   SessionId, SessionListState, SessionSummary, WorkspaceId, WorkspaceView,
 } from '@deepseek-ai/dsh-client-runtime/client'
 import {
-  deriveFlat, deriveGroups, deriveSearchResults, workspaceLabel, relativeTime,
+  deriveFlat, deriveGroups, derivePinned, deriveSearchResults, workspaceLabel, relativeTime,
   UNGROUPED_KEY, UNGROUPED_LABEL,
 } from '../src/client/tree.ts'
 import { createWorkspaceViewStore } from '../src/client/stores.ts'
@@ -209,6 +209,52 @@ describe('deriveGroups', () => {
     expect(ownedGroups.find(group => group.key === 'project')!.containsCurrent).toBe(true)
     const looseGroups = deriveGroups({ ...list(owned, loose), current: loose.id }, [ws], noArchive, view())
     expect(looseGroups.find(group => group.key === UNGROUPED_KEY)!.containsCurrent).toBe(true)
+  })
+
+  it('lifts pinned sessions out of their Workspace group and the Ungrouped bucket', () => {
+    const owned = summary('owned', 1)
+    const loose = summary('loose', 2)
+    const sessions = list(owned, loose)
+    const groups = deriveGroups(
+      sessions,
+      [workspace('project', ['owned', 'loose'])],
+      noArchive,
+      { expandedGroups: ['project', UNGROUPED_KEY], pinnedIds: ['loose'] },
+    )
+    // The pinned member leaves the group's tree and its count; the unpinned
+    // stray stops surfacing the Ungrouped bucket at all.
+    expect(groups.map(group => group.key)).toEqual(['project'])
+    expect(groups[0]!.sessions.map(node => node.id)).toEqual([owned.id])
+    expect(groups[0]!.sessionCount).toBe(1)
+  })
+})
+
+describe('derivePinned', () => {
+  it('returns visible pinned sessions in pin order across Workspaces', () => {
+    const a = summary('a', 3)
+    const b = summary('b', 2, '/projects/first')
+    const rows = derivePinned(list(a, b), noArchive, ['b', 'a'])
+    expect(rows.map(row => row.id)).toEqual([sid('b'), sid('a')])
+  })
+
+  it('drops stale, archived, and subagent-origin ids without pruning the order', () => {
+    const parent = summary('parent', 1)
+    const subagent = { ...summary('sub', 2), parentId: parent.id, origin: 'subagent' as const }
+    const sessions = list(parent, subagent)
+    const rows = derivePinned(
+      sessions,
+      archived('gone'),
+      ['gone', 'sub', 'ghost', 'parent'],
+    )
+    expect(rows.map(row => row.id)).toEqual([parent.id])
+  })
+
+  it('keeps the current blank session pinnable and excludes stale blanks', () => {
+    const currentBlank = { ...summary('current-blank', 5), blank: true }
+    const staleBlank = { ...summary('stale-blank', 4), blank: true }
+    const sessions = { ...list(currentBlank, staleBlank), current: currentBlank.id }
+    const rows = derivePinned(sessions, noArchive, ['stale-blank', 'current-blank'])
+    expect(rows.map(row => row.id)).toEqual([currentBlank.id])
   })
 })
 
@@ -431,6 +477,18 @@ describe('createWorkspaceViewStore', () => {
     expect(snapshot.groupExpansion).toEqual({ '': true, alpha: true })
     expect(snapshot.sessionOrderByAccount).toEqual({ alpha: ['alpha-session'] })
     expect(snapshot.sessionUpdatedAtByAccount).toEqual({ alpha: { 'alpha-session': 2 } })
+  })
+
+  it('toggles pinned sessions and keeps pin order as the toggle-on order', () => {
+    const store = createWorkspaceViewStore().create()
+    store.actions.setSessionPinned('two', true)
+    store.actions.setSessionPinned('one', true)
+    expect(store.getSnapshot().pinnedSessionIds).toEqual(['two', 'one'])
+    // Re-pinning moves the session to the end (most recently pinned).
+    store.actions.setSessionPinned('two', true)
+    expect(store.getSnapshot().pinnedSessionIds).toEqual(['one', 'two'])
+    store.actions.setSessionPinned('one', false)
+    expect(store.getSnapshot().pinnedSessionIds).toEqual(['two'])
   })
 })
 

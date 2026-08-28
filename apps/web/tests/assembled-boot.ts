@@ -62,14 +62,18 @@ if (webBundleResolver === undefined) throw new Error('assembled boot: web bundle
 const appBoot = await import(pathToFileURL(webBundleResolver.resolve('@deepseek-ai/dsh-app-boot')).href) as unknown as BootComposition
 
 function resolvePackageManifest(specifier: string): string | undefined {
+  // A user-level node_modules can shadow the workspace through resolver
+  // fall-through (a stale published copy lacks the current bootstrap face),
+  // so an in-repo resolution always wins over an outside one.
+  const candidates: string[] = []
   for (const require of bundleResolvers) {
     try {
-      return require.resolve(`${specifier}/package.json`)
+      candidates.push(require.resolve(`${specifier}/package.json`))
     } catch {
       continue
     }
   }
-  return undefined
+  return candidates.find(candidate => candidate.startsWith(REPO_ROOT)) ?? candidates[0]
 }
 
 function resolveClientExport(packagePath: string, pkg: ClientPackageManifest): string {

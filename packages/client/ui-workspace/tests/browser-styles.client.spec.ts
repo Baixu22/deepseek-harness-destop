@@ -1,7 +1,8 @@
 /**
  * WorkspaceBrowser spacing contract, asserted against the CSS text on disk:
  * row fills share the shell's trailing inset, the stable scrollbar counts
- * inside it, and flat, grouped, and search views keep their intended rhythm.
+ * inside it, and flat and grouped views keep their intended rhythm. The
+ * search palette styles live in their own SearchPalette.module.css.
  */
 import { readFileSync } from 'node:fs'
 import { fileURLToPath } from 'node:url'
@@ -71,7 +72,6 @@ describe('WorkspaceBrowser.module.css list', () => {
 
   it('joins a Workspace to its first child while keeping compact sibling and group gaps', () => {
     expect(declarations('.flatList > * + *')?.get('margin-top')).toBe('2px')
-    expect(declarations(".searchTree > [role='treeitem'] + [role='treeitem']")?.get('margin-top')).toBe('2px')
     expect(declarations('.groupSection > * + *')?.get('margin-top')).toBe('2px')
     expect(declarations('.groupSection > *:first-child + *')?.get('margin-top')).toBe('0')
     expect(declarations('.groupSection + .groupSection')?.get('margin-top')).toBe('4px')
@@ -97,12 +97,14 @@ describe('WorkspaceBrowser.module.css list', () => {
     }
   })
 
-  it('keeps the compact fade, overflow control, search field, and row heights', () => {
+  it('keeps the compact fade, overflow control, and row heights', () => {
     expect(declarations('.fade')?.get('height')).toBe('24px')
     expect(declarations('.sessionOverflowButton')?.get('height')).toBe('28px')
-    expect(declarations('.searchExpanded')?.get('height')).toBe('30px')
     expect(rowDeclarations('.projectRow')?.get('height')).toBe('34px')
-    expect(rowDeclarations('.sessionRow')?.get('height')).toBe('32px')
+    // The session card sizes to its content (title header), unlike the
+    // fixed-height workspace row above it.
+    expect(rowDeclarations('.sessionRow')?.get('height')).toBe('auto')
+    expect(rowDeclarations('.sessionRow')?.get('padding')).toBe('6px 8px')
     expect(rowDeclarations('.nestedSessionRow')?.get('padding-left')).toBe('30px')
     expect(rowDeclarations('.flatSessionRowWithoutStatus .title')?.get('margin-left')).toBe('0')
     expect(rowDeclarations('.searchResultRow')?.get('min-height')).toBe('48px')
@@ -114,5 +116,57 @@ describe('WorkspaceBrowser.module.css list', () => {
     expect(declarations('.rail .sectionHeader')?.get('justify-content')).toBe('flex-start')
     expect(declarations('.rail .iconButton')?.get('width')).toBe('36px')
     expect(declarations('.rail .search')?.get('width')).toBe('36px')
+  })
+
+  it('separates the pinned section from the workspace groups below it', () => {
+    const section = declarations('.pinnedSection')
+    expect(section?.get('border-bottom')).toBe('1px solid var(--dsw-alias-border-l1)')
+    expect(section?.get('margin-bottom')).toBe('8px')
+    // The 10px row gap reserves room for the stacked under-layers so they
+    // never overlap the next card or the first Workspace header.
+    expect(declarations('.pinnedSection .sessionRow + .sessionRow')?.get('margin-top')).toBe('10px')
+    expect(declarations('.pinnedHeader')?.get('font-size')).toBe('11px')
+  })
+})
+
+describe('Rows.module.css marquee and pinned card', () => {
+  it('moves only the inner marquee span, exactly its measured overflow', () => {
+    expect(rowDeclarations('.titleText')?.get('display')).toBe('inline-block')
+    expect(rowDeclarations('.titleText')?.get('white-space')).toBe('nowrap')
+    // Resolve against the base sheet only: the reduced-motion override (same
+    // selector) would overwrite the declaration in the naive rule scan.
+    const base = rowsCss.slice(0, rowsCss.indexOf('@media'))
+    const marquee = declarationsFrom(base, '.sessionRow:hover .titleText')
+    expect(marquee?.get('animation')).toContain('title-marquee')
+    expect(marquee?.get('animation')).toContain('var(--marquee-duration, 2s)')
+    // One iteration with a forwards fill: the hover runs the title once to
+    // its end and holds there — no alternate bounce-back loop.
+    expect(marquee?.get('animation')).toContain('forwards')
+    expect(marquee?.get('animation')).not.toContain('alternate')
+    // The travel is the measured variable set from Rows.tsx, never a fixed
+    // distance — the text cannot scroll past its own clipped box. (The
+    // helper splits keyframes into per-frame rules; the marquee's `to` frame
+    // is the only `to` in the file.)
+    expect(rowDeclarations('to')?.get('transform')).toBe('translateX(var(--marquee-shift, 0px))')
+    expect(rowDeclarations('.sessionRow:hover .title')?.get('text-overflow')).toBe('clip')
+  })
+
+  it('renders the pinned card as one complete elevated cell with verbs visible', () => {
+    const card = rowDeclarations('.sessionRow.pinned')
+    expect(card?.get('position')).toBe('relative')
+    expect(card?.get('background')).toBe('var(--dsw-alias-bg-layer-2)')
+    // One full border on all four sides — never the stacked under-layer
+    // slivers, which read as broken half-frames under the row.
+    expect(card?.get('border')).toBe('1px solid var(--dsw-alias-border-l1)')
+    expect(card?.get('animation')).toContain('pin-in')
+    expect(rowDeclarations('.pinned .rowActions')?.get('display')).toBe('inline-flex')
+    expect(rowDeclarations('.pinned .time')?.get('display')).toBe('none')
+    expect(rowDeclarations('.pinBadge')?.get('color')).toBe('var(--dsw-alias-state-business-primary)')
+  })
+
+  it('stills the marquee and the pinned entrance under prefers-reduced-motion', () => {
+    const block = rowsCss.replace(/\/[\s\S]*?\*\//g, ' ').match(/@media \(prefers-reduced-motion: reduce\) \{[\s\S]*$/)
+    expect(block?.[0]).toContain('.titleText')
+    expect(block?.[0]).toContain('.sessionRow')
   })
 })

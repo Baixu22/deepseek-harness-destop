@@ -26,6 +26,8 @@ declare module '@deepseek-ai/dsh-session-projection/types' {
      * is monotonic and may suppress a cold-log probe; `blank: true` is only a
      * checkpoint-prefix fact and must not hide a cold Session without direct
      * verification. `lastPromptAt` is the latest human-authored prompt time.
+     * `lastPromptText` is that prompt's first text block, truncated for list
+     * previews.
      */
     sessionListMetadata: SessionListMetadata
     /**
@@ -45,6 +47,12 @@ export interface SessionListMetadata {
   blank: boolean
   /** Latest source.kind=user message time in the checkpoint prefix. */
   lastPromptAt: number | null
+  /**
+   * First text block of the latest source.kind=user message, whitespace
+   * collapsed and truncated for session-list previews; null when that
+   * message carries no text block.
+   */
+  lastPromptText: string | null
 }
 
 declare module '@deepseek-ai/dsh-llm' {

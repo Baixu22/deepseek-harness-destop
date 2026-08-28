@@ -180,6 +180,7 @@ function mount(
           renderSlot={renderSlot as never}
           views={views}
           open={open}
+          rename={vi.fn().mockResolvedValue(undefined)}
           t={t}
         />
       )

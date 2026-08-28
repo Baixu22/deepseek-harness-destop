@@ -4,6 +4,7 @@
    a 2px active bar. */
 
 .root {
+  position: relative;
   display: flex;
   flex-direction: column;
   height: 100%;
@@ -23,6 +24,44 @@
   --dsh-composer-card-max-width: calc(var(--dsh-chat-content-width) + 32px);
   --dsh-composer-side-clearance: 16px;
   --dsh-composer-dock-inset: 8px;
+}
+
+/* Every column child stays above the absolutely-positioned particle layer. */
+.root > * {
+  position: relative;
+  z-index: 1;
+}
+
+/* Ambient particle backdrop (ui-primitives Particles): hero phase only.
+   Fades in on mount; the phase flip unmounts it outright. */
+.particles {
+  position: absolute;
+  inset: 0;
+  z-index: 0;
+  overflow: hidden;
+  animation: particles-in var(--ds-transition-duration-slow) var(--ds-ease-in-out);
+}
+
+/* Particle ink follows the scheme: hero-glow blue on both, tuned per theme
+   so the motes stay subtle against each backdrop. */
+body:not([data-ds-dark-theme]) {
+  --dsh-particles-ink: #6187d8;
+}
+
+body[data-ds-dark-theme] {
+  --dsh-particles-ink: #9db4e8;
+}
+
+@keyframes particles-in {
+  from {
+    opacity: 0;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .particles {
+    animation: none;
+  }
 }
 
 .header {
@@ -112,10 +151,83 @@
   background: var(--dsw-alias-interactive-bg-hover);
 }
 
+/* Current leaf crumb: hover reveals the rename affordance (dashed underline
+   + pencil cursor); double-click swaps in the inline input. */
+.crumbEditable {
+  cursor: text;
+  transition: background var(--ds-transition-duration) var(--ds-ease-in-out);
+}
+
+.crumbEditable:hover {
+  background: var(--dsw-alias-interactive-bg-hover);
+  text-decoration: underline dashed var(--dsw-alias-border-l4);
+  text-underline-offset: 4px;
+}
+
+/* Inline rename overlays the crumb it replaces: an invisible ghost keeps the
+   layout box while the input floats above it, so neither the input's width
+   nor its ring shifts the header. The ring is a box-shadow (no border box),
+   keeping the input's metrics exactly the crumb's. */
+.crumbRename {
+  position: relative;
+  display: inline-flex;
+  min-width: 0;
+}
+
+.crumbGhost {
+  visibility: hidden;
+}
+
+.crumbInput {
+  position: absolute;
+  top: 0;
+  left: 0;
+  z-index: 1;
+  width: max(100%, min(320px, 40vw));
+  padding: 4px 8px;
+  border: none;
+  border-radius: 8px;
+  background: var(--dsw-alias-bg-layer-1);
+  box-shadow: 0 0 0 1px var(--dsw-alias-border-l2), 0 2px 8px rgba(0, 0, 0, 0.08);
+  font-size: 14px;
+  line-height: 20px;
+  font-weight: 500;
+  color: var(--dsw-alias-label-primary);
+  outline: none;
+  animation: crumb-input-in var(--ds-transition-duration) var(--ds-ease-in-out);
+}
+
+@keyframes crumb-input-in {
+  from {
+    opacity: 0;
+    transform: scale(0.985);
+  }
+
+  to {
+    opacity: 1;
+    transform: scale(1);
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .crumbInput {
+    animation: none;
+  }
+}
+
+.crumbInput:focus {
+  box-shadow: 0 0 0 1px var(--dsw-alias-state-business-primary), 0 2px 8px rgba(0, 0, 0, 0.08);
+}
+
 .crumbCurrent {
   font-weight: 500;
   color: var(--dsw-alias-label-primary);
   cursor: default;
+}
+
+/* The editable leaf keeps the text cursor over .crumbCurrent's default. */
+.crumbCurrent.crumbEditable {
+  cursor: text;
 }
 
 .headerActions {
@@ -137,38 +249,94 @@
   display: none;
 }
 
-/* figma Tab_Group 34:11441: 35px strip, gap 36, pad-left 8, tabs bottom-aligned. */
+/* animate-ui Tabs: segmented pill strip (TabsHighlight family). The strip is
+   a rounded container; the traveling pill (layoutId) slides between triggers
+   with a spring, and the active label rides the business blue. */
 .tabs {
   position: relative;
   z-index: 1;
-  display: flex;
-  gap: 36px;
-  margin-top: 4px;
-  padding-left: 8px;
+  display: inline-flex;
+  gap: 2px;
+  width: fit-content;
+  margin-top: 8px;
+  padding: 3px;
+  border: 1px solid var(--dsw-alias-border-l1);
+  border-radius: 10px;
+  /* Segmented-track fill: a translucent ink tint that reads as a recessed
+     track in both themes (bg-layer-1/2 collapse to white in light mode). */
+  background: var(--dsw-alias-interactive-bg-hover);
 }
 
-/* figma .Tab 34:11442: 13/16 text (figma wt510, rendered 500), gap 8 to the 2px bar. */
 .tab {
   position: relative;
-  padding: 0 0 11px;
+  padding: 5px 16px;
   border: none;
+  border-radius: 7px;
   background: transparent;
   font-size: 13px;
   line-height: 16px;
   font-weight: 500;
   color: var(--dsw-alias-label-tertiary);
   cursor: pointer;
+  transition: color var(--ds-transition-duration) var(--ds-ease-in-out);
 }
 
-.tab::after {
-  content: '';
+/* The label rides its own stacking context above the absolutely-positioned
+   pill (the pill is a later sibling in DOM order, so an unpositioned label
+   would paint under it). */
+.tabLabel {
+  position: relative;
+  z-index: 1;
+}
+
+.tab:hover:not(.tabActive) {
+  color: var(--dsw-alias-label-secondary);
+}
+
+/* The active pill is ONE element owned by the strip (not per-tab), translated
+   to the active tab with a compositor-only transform — no layout animation,
+   no per-click re-measure. Position/size come from the trigger's offsetLeft/
+   offsetWidth via inline custom properties set in the component. */
+.tabIndicator {
   position: absolute;
-  right: 0;
-  bottom: 1px;
+  top: 3px;
+  bottom: 3px;
   left: 0;
-  height: 2px;
-  border-radius: 2px;
-  background: transparent;
+  width: 0;
+  border-radius: 7px;
+  transform: translateX(var(--tab-pill-x, 0)) scaleX(var(--tab-pill-scale, 1));
+  transform-origin: left center;
+  /* Raised pill: opaque surface + border + shadow so it reads as lifted in
+     both themes (bg-layer-2 equals the track in light mode, so the pill uses
+     the base surface with a border instead). */
+  background: var(--dsw-alias-bg-base);
+  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.12), 0 0 0 1px var(--dsw-alias-border-l2);
+  transition: transform var(--ds-transition-duration) var(--ds-ease-in-out);
+  will-change: transform;
+  pointer-events: none;
+}
+
+body[data-ds-dark-theme] .tabIndicator {
+  background: var(--dsw-alias-bg-layer-2);
+  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.3), 0 0 0 1px var(--dsw-alias-border-l1);
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .tabIndicator {
+    transition: none;
+  }
+}
+
+@keyframes tab-pill-in {
+  from {
+    opacity: 0;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .tabIndicator {
+    animation: none;
+  }
 }
 
 /* Selected tab is blue, not ink: brand-primary resolves to neutral black in
@@ -178,9 +346,7 @@
   color: var(--dsw-alias-state-business-primary);
 }
 
-.tabActive::after {
-  background: var(--dsw-alias-state-business-primary);
-}
+
 
 .viewArea {
   display: flex;

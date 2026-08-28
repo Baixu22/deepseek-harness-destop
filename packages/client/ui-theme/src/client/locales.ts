@@ -6,6 +6,7 @@ export const zh = {
   'appearance.light': '浅色',
   'appearance.dark': '深色',
   'appearance.system': '跟随系统',
+  'toggle.aria': '切换深浅色主题',
 } satisfies Record<string, string>
 
 /** The settings.theme namespace key union. */
@@ -17,4 +18,5 @@ export const en = {
   'appearance.light': 'Light',
   'appearance.dark': 'Dark',
   'appearance.system': 'System',
+  'toggle.aria': 'Toggle theme',
 } satisfies Record<ThemeKey, string>

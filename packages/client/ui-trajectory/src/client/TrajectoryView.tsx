@@ -31,6 +31,12 @@ import css from './views.module.css'
 const EMPTY_TURN_IDS: ReadonlySet<number> = new Set()
 const EMPTY_RECORD_IDS: ReadonlySet<string> = new Set()
 const SEARCH_INDEX_THROTTLE_MS = 3_000
+/**
+ * The first full-text index build waits out the tab switch: the trajectory
+ * view mounts on a deferred render, and indexing the whole ledger
+ * synchronously right after mount still blocks the tab pill animation.
+ */
+const SEARCH_INDEX_INITIAL_DELAY_MS = 400
 
 function lastCellIndex(turns: readonly TrajectoryTurnModel[]): number {
   let last = 0
@@ -297,10 +303,12 @@ export function TrajectoryView({
   useEffect(() => {
     if (!searchIndexInitialized.current) {
       searchIndexInitialized.current = true
-      if (searchIndex.update(searchLayouts)) {
-        setSearchIndexRevision(revision => revision + 1)
-      }
-      return
+      const timer = setTimeout(() => {
+        if (searchIndex.update(latestSearchLayouts.current)) {
+          setSearchIndexRevision(revision => revision + 1)
+        }
+      }, SEARCH_INDEX_INITIAL_DELAY_MS)
+      return () => { clearTimeout(timer) }
     }
     if (searchIndexTimer.current !== null) return
     searchIndexTimer.current = setTimeout(() => {

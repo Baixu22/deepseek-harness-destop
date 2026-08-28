@@ -22,6 +22,13 @@ declare module '@deepseek-ai/dsh-client-ui-slots' {
      */
     'settings.trigger': { kind: 'single'; scope: 'root'; owner: SettingsTriggerOwnerProps }
     /**
+     * Optional control rendered to the RIGHT of the settings trigger button
+     * in the sidebar foot (same row when wide, stacked above in the rail).
+     * The seat exists for the theme feature's animated toggler; absent
+     * contribution leaves the trigger row unchanged.
+     */
+    'settings.trigger.trailing': { kind: 'single'; scope: 'root'; owner: SettingsTriggerTrailingOwnerProps }
+    /**
      * The panel title text seat. Content renders inside the nav heading row;
      * the dialog's accessible name points at that node via aria-labelledby.
      * Absent contribution leaves the heading empty.
@@ -103,6 +110,12 @@ export interface SettingsPluginsTabOwnerProps {
 /** Owner share of the trigger content seat: the sidebar column state. */
 export interface SettingsTriggerOwnerProps {
   /** Whether the sidebar renders wide content (false = 56px rail, icon only). */
+  wide: boolean
+}
+
+/** Owner share of the trigger-leading seat: the sidebar column state. */
+export interface SettingsTriggerTrailingOwnerProps {
+  /** Whether the sidebar renders wide content (false = 56px rail). */
   wide: boolean
 }
 

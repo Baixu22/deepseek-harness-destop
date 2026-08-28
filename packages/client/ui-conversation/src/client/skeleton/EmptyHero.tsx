@@ -129,7 +129,9 @@ export function CursorBlendRing(): ReactNode {
     const ring = ref.current
     const copy = copyRef.current
     if (ring === null || copy === null) return
-    if (window.matchMedia('(hover: none), (pointer: coarse)').matches) return
+    // Guarded: matchMedia-less environments (jsdom) skip the ring entirely.
+    if (typeof window.matchMedia !== 'function'
+      || window.matchMedia('(hover: none), (pointer: coarse)').matches) return
     let targetX = 0
     let targetY = 0
     let x = 0

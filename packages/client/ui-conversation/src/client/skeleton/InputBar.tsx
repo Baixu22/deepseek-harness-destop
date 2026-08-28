@@ -25,6 +25,7 @@ import type { ComposerBarProps } from '../contract/slots.ts'
 import { deriveDecorations } from '../input/decorations.ts'
 import type { DraftDecorations } from '../input/decorations.ts'
 import type { EditRange } from '../input/contract.ts'
+import { LongTextCard, LONG_TEXT_MIN_CHARS, isLongText } from '../chat/LongTextCard.tsx'
 import { attachmentErrorText, imageSizeText } from '../image-labels.ts'
 import { ReferenceIcon } from '../reference/ReferenceIcon.tsx'
 import { ContextMeter } from './ContextMeter.tsx'
@@ -106,6 +107,16 @@ export function InputBar({
     [draftImages, input?.imageIds],
   )
   const empty = draft.trim() === '' && attachments.length === 0
+  // Long-text intake (DeepSeek Chat paste semantics): a paste at or above the
+  // threshold collapses the draft into a document card so the composer stays
+  // readable. The full text remains in the machine draft — Enter and Send
+  // submit it verbatim — and the card's action restores the visible text.
+  // Typing, an emptied draft (post-send), or a session switch ends the
+  // collapse; short drafts can never be collapsed.
+  const [longCollapsed, setLongCollapsed] = useState(false)
+  const collapsedLong = longCollapsed && isLongText(draft)
+  useEffect(() => { setLongCollapsed(false) }, [sessionId])
+  useEffect(() => { if (draft === '') setLongCollapsed(false) }, [draft])
   // Transient error banner (machine notices, image-intake rejections, and
   // prompt failures): the seq keys the Toast so an identical repeated message
   // restarts the hold-then-fade cycle instead of reusing the faded one.
@@ -439,6 +450,7 @@ export function InputBar({
     if (keyboard === undefined || locked) return // disabled/read-only states cannot edit the draft
     if (machineBusy) return // submitting is the read-only span; adjudicating holds the pending lock
     const next = e.target.value
+    if (longCollapsed) setLongCollapsed(false) // any typed edit re-reveals the draft
     const pending = pendingEditRef.current
     pendingEditRef.current = null
     safariNativeShrinkRef.current = safari && next.length < draft.length
@@ -497,6 +509,7 @@ export function InputBar({
     // opens in the machine and the controller upgrades tokens as matches
     // land (paste-upgrade). The DOM layer only starts the transaction.
     keyboard.pasteBegin(text, sel)
+    if (text.length >= LONG_TEXT_MIN_CHARS) setLongCollapsed(true)
     const caret = sel.start + text.length
     restoreCaret(el, caret)
     keyboard.track(keyboard.snapshot.draft, caret)
@@ -557,6 +570,22 @@ export function InputBar({
     if (el !== null) toggleCommandMenu?.(selectionOf(el))
   }
 
+  // The card's action ("paste the original back"): end the collapse and put
+  // the caret at the draft's end, the position the hidden textarea kept.
+  const expandLongDraft = (): void => {
+    setLongCollapsed(false)
+    const el = inputRef.current
+    if (el === null) return
+    el.focus({ preventScroll: true })
+    restoreCaret(el, draft.length)
+  }
+  // The card's dismiss (✕): discard the collapsed draft outright, emptying
+  // the composer (the full text lives only in the machine draft).
+  const discardLongDraft = (): void => {
+    setLongCollapsed(false)
+    keyboard?.setDraft('', { start: 0, end: draft.length, insertedLength: 0 })
+  }
+
   // Ordinary sessions retain their primary Send/Stop toggle. A continuable
   // child keeps Send as the primary action and exposes Stop independently so
   // pointer users can queue follow-ups while its current turn is running.
@@ -579,6 +608,20 @@ export function InputBar({
   const accessSelect: ReactNode = command === undefined
     ? null
     : <PermissionSelect key={sessionId} value={permissions} locked={locked} command={command} t={t} />
+
+  // The textarea's placeholder, shared with the collapsed-state ghost: the
+  // native placeholder cannot show over a non-empty (hidden long) draft, so
+  // the backdrop paints the same copy while collapsed.
+  const placeholderText = placeholder ?? (parentOffline
+    ? t('placeholder.parentOffline')
+    : disabled
+      ? t('placeholder.unavailable')
+      // The steer hint deliberately outranks the plan placeholder: while it
+      // shows, the whole-queue gesture is genuinely available (the gate never
+      // consults plan mode), so the actionable hint wins.
+      : canSteerQueue
+        ? t('placeholder.steerQueue')
+        : planActive ? t('placeholder.plan') : t('placeholder.default'))
 
   // Mirror-layer decorations: a visible backdrop with transparent textarea
   // text. Claim tokens and references retain the draft's own glyph metrics,
@@ -717,6 +760,11 @@ export function InputBar({
             size: imageSizeText(imageLimits.maxImageBytes),
           },
         })}
+        {collapsedLong && (
+          <div className={css.longTextWrap}>
+            <LongTextCard text={draft} actionLabel={t('longText.pasteBack')} onAction={expandLongDraft} onDismiss={discardLongDraft} />
+          </div>
+        )}
         {/* One scrollport, two text layers. The hidden mirror renders draft+'\n' and stretches the
             stack to the draft's FULL height (counting rows by '\n' cannot see soft wraps); the
             absolutely-positioned backdrop and textarea ride that height, and .scroll — capped at 14
@@ -732,7 +780,7 @@ export function InputBar({
               data-input-backdrop
               data-disabled={textareaDisabled || undefined}
             >
-              {backdrop}
+              {collapsedLong ? <span className={css.longTextGhost}>{placeholderText}</span> : backdrop}
             </div>
             <textarea
               ref={inputRef}
@@ -744,16 +792,7 @@ export function InputBar({
               aria-haspopup={workspaceTrigger ? 'menu' : undefined}
               aria-expanded={workspaceTrigger ? workspacePickerOpen : undefined}
               data-phase={input?.phase ?? 'inert'}
-              placeholder={placeholder ?? (parentOffline
-                ? t('placeholder.parentOffline')
-                : disabled
-                  ? t('placeholder.unavailable')
-                  // The steer hint deliberately outranks the plan placeholder:
-                  // while it shows, the whole-queue gesture is genuinely available
-                  // (the gate never consults plan mode), so the actionable hint wins.
-                  : canSteerQueue
-                    ? t('placeholder.steerQueue')
-                    : planActive ? t('placeholder.plan') : t('placeholder.default'))}
+              placeholder={placeholderText}
               rows={2}
               onChange={onChange}
               onKeyDown={onKeyDown}
@@ -764,7 +803,7 @@ export function InputBar({
               onCompositionStart={onCompositionStart}
               onCompositionEnd={onCompositionEnd}
             />
-            <div ref={mirrorRef} aria-hidden className={css.mirror} data-input-mirror>{`${draft}\n`}</div>
+            <div ref={mirrorRef} aria-hidden className={css.mirror} data-input-mirror>{collapsedLong ? '\n' : `${draft}\n`}</div>
           </div>
         </div>
         <div className={css.row}>

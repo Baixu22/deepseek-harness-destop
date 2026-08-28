@@ -695,11 +695,11 @@ select.input {
 .ddTrigger[data-open="true"]::after { transform: translateY(-50%) rotate(180deg); }
 .ddSummary { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .ddEmpty { color: var(--dsw-alias-label-tertiary, var(--dsw-alias-label-secondary)); }
-.ddPanel { position: absolute; z-index: 60; top: calc(100% + 4px); left: 0; min-width: 100%; max-height: 264px; overflow: auto; background: var(--dsw-alias-button-floating-fill); border: 1px solid var(--dsw-alias-border-l2); border-radius: 10px; padding: 4px; box-shadow: var(--dsw-shadow-lv2, 0 8px 24px rgba(0, 0, 0, .35)); }
+.ddPanel { position: absolute; z-index: 60; top: calc(100% + 4px); left: 0; min-width: 100%; max-height: 264px; overflow: auto; background: var(--dsw-alias-button-floating-fill); border: 1px solid var(--dsw-alias-border-l2); border-radius: 10px; padding: 4px; box-shadow: var(--dsw-shadow-lv2); }
 .ddOption { display: flex; align-items: center; gap: 8px; width: 100%; padding: 6px 8px; border: 0; border-radius: 6px; background: none; color: var(--dsw-alias-label-primary); font: inherit; font-size: 13px; line-height: 20px; cursor: pointer; text-align: left; white-space: nowrap; }
 .ddOption:hover { background: var(--dsw-alias-button-floating-hover); }
-.ddCheck { width: 14px; height: 14px; border-radius: 4px; border: 1px solid var(--dsw-alias-border-l3, rgba(129, 133, 140, .5)); display: inline-flex; align-items: center; justify-content: center; color: transparent; flex: none; }
-.ddOption[aria-selected="true"] .ddCheck { background: var(--dsw-alias-button-info-fill, #4176e6); border-color: transparent; color: var(--dsw-static-neutral-00, #fff); }
+.ddCheck { width: 14px; height: 14px; border-radius: 4px; border: 1px solid var(--dsw-alias-border-l3); display: inline-flex; align-items: center; justify-content: center; color: transparent; flex: none; }
+.ddOption[aria-selected="true"] .ddCheck { background: var(--dsw-alias-button-info-fill); border-color: transparent; color: var(--dsw-static-neutral-00); }
 
 /* About section (desktop edition). */
 /* About section: brand head plus a hairline row list in the panel language. */
@@ -709,14 +709,66 @@ select.input {
 .aboutId { display: flex; flex-direction: column; gap: 2px; min-width: 0; }
 .aboutName { font-size: 16px; line-height: 24px; font-weight: 500; }
 .aboutTag { font-size: 12px; line-height: 18px; color: var(--dsw-alias-label-tertiary); }
-.aboutPill { margin-left: auto; flex: none; padding: 1px 10px; border: 1px solid var(--dsw-alias-border-l2); border-radius: 24px; background: var(--dsw-alias-fill-tsp-secondary); color: var(--dsw-alias-label-secondary); font-family: var(--ds-font-family-code); font-size: 12px; line-height: 20px; }
+.aboutPill { margin-left: auto; flex: none; padding: 1px 10px; border: 1px solid var(--dsw-alias-border-l2); border-radius: 24px; background: var(--dsw-alias-state-business-tertiary); color: var(--dsw-alias-label-secondary); font-family: var(--ds-font-family-code); font-size: 12px; line-height: 20px; }
 .aboutRows { display: flex; flex-direction: column; border-top: 1px solid var(--dsw-alias-border-l2); }
 .aboutRow { display: flex; align-items: center; justify-content: space-between; gap: 16px; padding: 12px 2px; border-bottom: 1px solid var(--dsw-alias-border-l2); }
 .aboutKey { flex: none; font-size: 13px; line-height: 20px; color: var(--dsw-alias-label-tertiary); }
 .aboutValue { min-width: 0; font-size: 13px; line-height: 20px; color: var(--dsw-alias-label-primary); text-align: right; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .aboutLink { color: var(--dsw-alias-label-primary-bluish); font-size: 13px; line-height: 20px; text-decoration: none; word-break: break-all; }
 .aboutLink:hover { text-decoration: underline; }
+
+/* Repo hover card: address + hint riding theme tokens, with the live page
+   screenshot as a pure enhancement — text renders at once, the shot appears
+   once the snapshot service delivers, and a failed load just drops the
+   image. The two opacity states switch without a transition on purpose: a
+   transition runs on the animation clock, which Chromium freezes on
+   occluded windows, and would strand the delivered shot at opacity 0. */
+.aboutRepoCard {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  max-width: 280px;
+}
+
+.aboutRepoCardShot {
+  width: 100%;
+  aspect-ratio: 3 / 2;
+  border-radius: 8px;
+  border: 1px solid var(--dsw-alias-border-l2);
+  object-fit: cover;
+  opacity: 0;
+}
+
+.aboutRepoCardShotOk {
+  opacity: 1;
+}
+
+.aboutRepoCardUrl {
+  font-size: 12px;
+  line-height: 16px;
+  color: var(--dsw-alias-label-primary);
+  word-break: break-all;
+  font-family: var(--ds-font-family-code);
+}
+
+.aboutRepoCardHint {
+  font-size: 11px;
+  line-height: 16px;
+  color: var(--dsw-alias-label-tertiary);
+}
+
 .aboutCheckBtn { min-width: 108px; height: 28px; padding: 0 14px; border: none; border-radius: 14px; background: var(--dsw-alias-interactive-bg-hover); color: var(--dsw-alias-label-primary); font: inherit; font-size: 12px; line-height: 20px; font-weight: 500; cursor: pointer; }
 .aboutCheckBtn:hover { background: var(--dsw-alias-button-floating-hover); }
 .aboutCheckBtn:disabled { opacity: .6; cursor: default; }
 .aboutFoot { margin: 0; font-size: 12px; line-height: 18px; color: var(--dsw-alias-label-caption); }
+
+/* Icon-cloud glyph ink follows the scheme so the rasterized SVGs stay
+   visible on both About backdrops (IconCloud re-reads on the attribute
+   flip). */
+body:not([data-ds-dark-theme]) {
+  --dsh-about-cloud-ink: #5b6472;
+}
+
+body[data-ds-dark-theme] {
+  --dsh-about-cloud-ink: #9aa4b5;
+}

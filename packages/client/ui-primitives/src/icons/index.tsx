@@ -870,3 +870,18 @@ export const IconArchiveOutline20 = ({ size = 20, className }: IconProps) => (
     <path d="M12.7962 12.5661V11.0832H7.20548V12.5661L12.7962 12.5661Z" fill="currentColor" />
   </svg>
 )
+
+/** ic_ds_pin_outline_16 (harness extract): diagonal pushpin — head top-right,
+ *  needle to the bottom-left. Stroke-built like the session hover glyphs, so
+ *  the 1.2px ring survives the 14-16px render sizes the row badge uses. */
+export const IconPinOutline16 = ({ size = 16, className }: IconProps) => (
+  <svg width={size} height={size} className={className} viewBox="0 0 16 16" fill="none" xmlns="http://www.w3.org/2000/svg">
+    <path
+      d="M10.03 2.06a1.6 1.6 0 0 1 2.26 0l1.65 1.65a1.6 1.6 0 0 1 0 2.26l-.62.62c-.3.3-.7.5-1.12.54l-1.99.2-2.35 2.34.14 1.87c.04.5-.14 1-.5 1.35l-.5.5a.78.78 0 0 1-1.1 0L2.61 10.1a.78.78 0 0 1 0-1.1l.5-.5c.35-.36.85-.54 1.35-.5l1.87.14 2.34-2.35.2-1.99c.05-.42.24-.81.54-1.12l.62-.62Z"
+      stroke="currentColor"
+      strokeWidth="1.2"
+      strokeLinejoin="round"
+    />
+    <path d="M3.3 12.7 6.2 9.8" stroke="currentColor" strokeWidth="1.2" strokeLinecap="round" />
+  </svg>
+)

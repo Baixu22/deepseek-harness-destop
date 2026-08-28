@@ -58,7 +58,9 @@ export function AgentPresetLabel({
   // App-styled bubble (name over description) instead of the OS title
   // tooltip: instant, theme-consistent, same language as every other hover
   // label in the app.
-  const tip = text === undefined ? t('headerHint') : text.name + '\n' + text.description
+  const tip = text === undefined
+    ? t('headerHint')
+    : text.description === undefined ? text.name : `${text.name}\n${text.description}`
   return (
     <Tooltip label={tip} side="bottom" delayMs={120}>
       <span className={css.label}>

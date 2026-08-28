@@ -6,6 +6,7 @@ import { useCallback, useEffect, useRef, useState } from 'react'
 import clsx from 'clsx'
 import type { WorkspaceId } from '@deepseek-ai/dsh-client-runtime/client'
 import type { ConversationSlotProps, InputZone } from '../contract/slots.ts'
+import { Particles } from '@deepseek-ai/dsh-client-ui-primitives'
 import { HeroGlow, HeroShell, WorkspaceChip, workspaceLabel } from './EmptyHero.tsx'
 import css from './ConversationRoot.module.css'
 
@@ -185,6 +186,9 @@ export function ConversationRoot({
 
   return (
     <div className={css.root} data-phase={phase}>
+      {/* Ambient particle field: blank-session backdrop only — it unmounts
+          the moment a conversation starts. */}
+      {phase === 'hero' && <div className={css.particles}><Particles /></div>}
       {renderSlot('conversation.session.header', {})}
       <div className={css.scrollBody} data-conversation-scroll="">
         {renderSlot('conversation.session', {})}

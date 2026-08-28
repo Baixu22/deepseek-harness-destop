@@ -17,7 +17,9 @@ import type {} from '@deepseek-ai/dsh-client-ui-settings/client'
 import type {} from '@deepseek-ai/dsh-client-locale/client'
 import type { AppearanceRowInjected } from './AppearanceRow.tsx'
 import { AppearanceRow } from './AppearanceRow.tsx'
-import { createAppearanceRowStore } from './settings-store.ts'
+import type { ThemeTogglerInjected } from './ThemeToggler.tsx'
+import { ThemeToggler } from './ThemeToggler.tsx'
+import { createAppearanceRowStore, createThemeTogglerStore } from './settings-store.ts'
 import { installThemeStyles } from './styles.ts'
 import { en, zh, type ThemeKey } from './locales.ts'
 import {
@@ -26,7 +28,8 @@ import {
 } from '../theme-settings.ts'
 
 export type { AppearanceRowComponentProps, AppearanceRowInjected } from './AppearanceRow.tsx'
-export type { AppearanceRowState } from './settings-store.ts'
+export type { ThemeTogglerComponentProps, ThemeTogglerInjected } from './ThemeToggler.tsx'
+export type { AppearanceRowState, ThemeTogglerState } from './settings-store.ts'
 export type { ThemeKey } from './locales.ts'
 export type { ThemePreference, ThemeSettings } from '../theme-settings.ts'
 
@@ -413,4 +416,26 @@ export function apply(ctx: ClientContext): void {
     locale: SETTINGS_NS,
     inject: injected,
   }, AppearanceRow))
+
+  // The sidebar-foot theme toggle: the resolved scheme mirrors the service
+  // snapshot through its own store; the write rides the same setTheme.
+  const togglerStore = createThemeTogglerStore()
+  let boundToggler: BoundActions<typeof togglerStore> | undefined
+  const syncToggler = (snapshot: ThemeSnapshot): void => {
+    boundToggler?.sync(snapshot.active.colorScheme, snapshot.revision)
+  }
+  ctx.on('theme/change', syncToggler)
+  const togglerInjected = (actions: BoundActions<typeof togglerStore>): ThemeTogglerInjected => {
+    boundToggler = actions
+    syncToggler(theme.getTheme())
+    return {
+      setTheme: (id) => { theme.setTheme(id) },
+    }
+  }
+  ctx.slots.inject('settings.trigger.trailing', () => ctx.slots.register({
+    name: 'settings.trigger.trailing',
+    store: togglerStore,
+    locale: SETTINGS_NS,
+    inject: togglerInjected,
+  }, ThemeToggler))
 }

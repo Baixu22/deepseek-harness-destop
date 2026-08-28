@@ -8,10 +8,11 @@ import { LocaleRuntime } from '@deepseek-ai/dsh-client-locale/client'
 import { TestRemote } from '@deepseek-ai/dsh-client-test-runtime'
 import { apply as settingsApply, inject as settingsInject } from '@deepseek-ai/dsh-client-ui-settings/client'
 import { apply, inject, SETTINGS_NS } from '@deepseek-ai/dsh-client-ui-theme/client'
-import type { AppearanceRowInjected, ThemeRuntime } from '@deepseek-ai/dsh-client-ui-theme/client'
+import type { AppearanceRowInjected, ThemeRuntime, ThemeTogglerInjected } from '@deepseek-ai/dsh-client-ui-theme/client'
 import { THEME_SETTINGS_NAMESPACE, ThemeSettingsSchema } from '../src/theme-settings.ts'
 import { AppearanceRow } from '../src/client/AppearanceRow.tsx'
-import type { createAppearanceRowStore } from '../src/client/settings-store.ts'
+import { ThemeToggler } from '../src/client/ThemeToggler.tsx'
+import type { createAppearanceRowStore, createThemeTogglerStore } from '../src/client/settings-store.ts'
 
 // These specs assert the shipped Chinese copy. The lane has no jsdom `window`,
 // so browser-language detection never runs and a fresh LocaleRuntime opens on
@@ -219,5 +220,46 @@ describe('ui-theme apply', () => {
     await f2.await()
     await f2.dispose()
     expect(quiet.slots.entries(SLOT)).toHaveLength(0)
+  })
+})
+
+describe('ui-theme apply: sidebar-foot theme toggler', () => {
+  const LEADING = 'settings.trigger.trailing'
+
+  function declareLeading(slots: SlotRegistry): () => void {
+    return slots.register(
+      { name: 'root', children: { [LEADING]: { kind: 'single', scope: 'root' } } } as never,
+      () => null,
+    )
+  }
+
+  it('registers the toggler and keeps its scheme mirror on the resolved snapshot', async () => {
+    const b = await bench()
+    declareLeading(b.slots)
+    await b.ctx.plugin({ inject: [...inject], apply }).await()
+    const theme = b.ctx.get('theme') as ThemeRuntime
+    // An event ahead of any inject hits the unbound-actions arm.
+    theme.setTheme('dark')
+
+    const entry = b.slots.entries(LEADING).find(e => e.component === ThemeToggler)!
+    expect(entry.locale).toBe(SETTINGS_NS)
+    const handle = entry.store as ReturnType<typeof createThemeTogglerStore>
+    const instance = handle.create()
+    const face = (entry.inject as unknown as (a: typeof instance.actions) => ThemeTogglerInjected)(instance.actions)
+    // The inject-time re-sync sealed the init window: the mirror is current.
+    expect(instance.getSnapshot().scheme).toBe('dark')
+
+    face.setTheme('light')
+    expect(theme.getTheme().preference).toBe('light')
+    expect(instance.getSnapshot().scheme).toBe('light')
+  })
+
+  it('waits for the declaration like every other seat (apply first, declare after)', async () => {
+    const b = await bench()
+    await b.ctx.plugin({ inject: [...inject], apply }).await()
+    expect(b.slots.entries(LEADING)).toHaveLength(0)
+    declareLeading(b.slots)
+    await Promise.resolve()
+    expect(b.slots.entries(LEADING).some(e => e.component === ThemeToggler)).toBe(true)
   })
 })

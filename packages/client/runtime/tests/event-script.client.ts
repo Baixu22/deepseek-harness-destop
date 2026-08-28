@@ -17,6 +17,12 @@ export const ev = {
     at(seq, { type: 'user/message', surfaceOp: 'append', data: createUserMessage({
       content: text(body), source: { kind: 'user' },
     }) }),
+  /** An injected user message with a caller-chosen data.id (legacy host
+   *  instruction hints reuse one deterministic id across resumes). */
+  hint: (seq: number, id: string, body: string): SessionEvent =>
+    at(seq, { type: 'user/message', surfaceOp: 'append', data: { ...createUserMessage({
+      content: text(body), source: { kind: 'plugin', plugin: 'instruction-hint' },
+    }), id } }),
   stepStart: (seq: number, turn: number, step = 0): SessionEvent =>
     at(seq, { type: 'step/start', data: { turn, step } }),
   chunkStart: (seq: number, turn: number, step = 0, index = 0): SessionEvent =>

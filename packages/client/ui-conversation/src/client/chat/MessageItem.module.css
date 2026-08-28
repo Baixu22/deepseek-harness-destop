@@ -33,6 +33,72 @@
   font-size: 12px;
   line-height: 18px;
 }
+
+/* Collapse affordance under an expanded long-text bubble. */
+.longTextCollapse {
+  margin-top: 8px;
+  padding: 0;
+  border: none;
+  background: none;
+  color: var(--dsw-alias-label-secondary);
+  font-size: 13px;
+  line-height: 20px;
+  text-decoration: underline;
+  text-underline-offset: 2px;
+  cursor: pointer;
+}
+
+/* Long-text expand/collapse morph: one clipping panel that grows from the
+   card height to the bubble height (inline `height` from measured px values,
+   because CSS cannot interpolate to `auto`) while its two stacked layers
+   cross-fade through blur — the departing layer blurs out, the arriving layer
+   emerges from blur, both anchored to the top-right corner so the message
+   never leaves its transcript position. One shared decelerate curve
+   (0.17, 1, 0.33, 1) in both directions; every property is a transition, so a
+   mid-flight toggle reverses from the current progress. The blur lands
+   earlier than the size so the settled frame is always crisp. */
+.morph {
+  display: grid;
+  align-items: start;
+  justify-items: end;
+  overflow: hidden;
+  width: 100%;
+  transition: height 520ms cubic-bezier(0.17, 1, 0.33, 1);
+}
+
+/* Before the first measurement the container rides content height; animating
+   from that unset height to a measured one would flash on mount. */
+.morphStatic {
+  transition: none;
+}
+
+.morphLayer {
+  grid-area: 1 / 1;
+  min-width: 0;
+  opacity: 0;
+  filter: blur(12px);
+  transform: scale(0.92);
+  transform-origin: top right;
+  pointer-events: none;
+  transition:
+    opacity 300ms cubic-bezier(0.17, 1, 0.33, 1),
+    filter 300ms cubic-bezier(0.17, 1, 0.33, 1),
+    transform 520ms cubic-bezier(0.17, 1, 0.33, 1);
+}
+
+.morphVisible {
+  opacity: 1;
+  filter: blur(0);
+  transform: none;
+  pointer-events: auto;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .morph,
+  .morphLayer {
+    transition: none;
+  }
+}
 .contextRow {
   padding: 2px 0;
 }

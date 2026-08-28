@@ -70,6 +70,9 @@ export class AppWebEntry {
       const ctx = new Context()
       this.ctx = ctx
       await this.runPluginBoot(ctx, prefetching)
+      // The plugin tree is already active past this point, so awaiting the
+      // reveal playback gates only the visual handoff, never readiness.
+      await this.page.awaitReveal()
       await this.mountApp(ctx)
     } catch (reason) {
       console.error(reason)

@@ -1,0 +1,41 @@
+/* Height morph shared by disclosure bodies and collapsible groups: the panel
+   height animates between 0 and a measured px value (imperative inline style
+   from the component, because `auto` and grid tracks do not interpolate)
+   while the content blurs out/in — the same decelerate curve and blur
+   crossfade as the long-text card morph. The panel anchors below the header
+   row, so the header never moves; content below is pushed by the growing
+   height. */
+
+.morph {
+  overflow: hidden;
+  transition: height 520ms cubic-bezier(0.17, 1, 0.33, 1);
+}
+
+.clip {
+  min-width: 0;
+  opacity: 0;
+  visibility: hidden;
+  filter: blur(6px);
+  transition:
+    opacity 300ms cubic-bezier(0.17, 1, 0.33, 1),
+    filter 300ms cubic-bezier(0.17, 1, 0.33, 1),
+    visibility 0s 520ms;
+}
+
+.open .clip {
+  opacity: 1;
+  visibility: visible;
+  filter: blur(0);
+  transition:
+    opacity 300ms cubic-bezier(0.17, 1, 0.33, 1),
+    filter 300ms cubic-bezier(0.17, 1, 0.33, 1),
+    visibility 0s;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .morph,
+  .clip,
+  .open .clip {
+    transition: none;
+  }
+}

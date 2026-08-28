@@ -276,6 +276,7 @@ function mount(slots: SlotRegistry, nodes: ConversationSnapshot['nodes'] = NODES
         useInput={useInput}
         inputActions={inputActions}
         open={vi.fn()}
+        rename={vi.fn().mockResolvedValue(undefined)}
         t={tConversation}
       />
       <ConversationSession

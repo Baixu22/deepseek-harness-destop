@@ -56,6 +56,7 @@ describe('sessions.list cold merge', () => {
       header('locationless', 500, { parentSession: sid('session-parent'), origin: 'subagent' }),
       header('vanished', 600),
       header('read-failure', 700),
+      header('uncached-conversation', 800),
     ]
     const readFrom = vi.fn(async (id: SessionId) => {
       if (id === sid('small-blank')) {
@@ -77,6 +78,19 @@ describe('sessions.list cold merge', () => {
           ] as SessionEvent[],
         }
       }
+      if (id === sid('uncached-conversation')) {
+        return {
+          meta: metas[7]!,
+          events: [
+            { type: 'turn/start', seq: 0, time: 800, data: { turn: 1 } },
+            {
+              type: 'user/message', seq: 1, time: 1200,
+              data: createUserMessage({ content: [{ type: 'text', text: 'previewed' }], source: { kind: 'user' } }),
+              surfaceOp: 'append',
+            },
+          ] as SessionEvent[],
+        }
+      }
       if (id === sid('read-failure')) throw new Error('simulated read failure')
       throw new Error(`unexpected cold read: ${id}`)
     })
@@ -93,18 +107,24 @@ describe('sessions.list cold merge', () => {
     ctx.provide('sessionProjectionCache', {
       cachedSnapshot: (meta: SessionHeader) => {
         if (meta.id === sid('small-blank')) {
-          return { asOfSeq: 0, values: { sessionListMetadata: { blank: true, lastPromptAt: null } } }
+          return { asOfSeq: 0, values: { sessionListMetadata: { blank: true, lastPromptAt: null, lastPromptText: null } } }
         }
         if (meta.id === sid('small-conversation')) {
-          return { asOfSeq: 0, values: { sessionListMetadata: { blank: true, lastPromptAt: 900 } } }
+          return { asOfSeq: 0, values: { sessionListMetadata: { blank: true, lastPromptAt: 900, lastPromptText: null } } }
         }
         if (meta.id === sid('cached-nonblank')) {
-          return { asOfSeq: 1, values: { sessionListMetadata: { blank: false, lastPromptAt: 1000 } } }
+          return { asOfSeq: 1, values: { sessionListMetadata: { blank: false, lastPromptAt: 1000, lastPromptText: null } } }
         }
         return undefined
       },
     } as never)
-    const api = createApiProxy(ctx, { defaultModelSelection: () => ({ provider: 'p', model: 'm' }), cwd: '/tmp' })
+    // An explicit 1 KiB bound pins the eligibility edge: the default admits
+    // normal conversation logs because the probe also carries the preview.
+    const api = createApiProxy(ctx, {
+      defaultModelSelection: () => ({ provider: 'p', model: 'm' }),
+      cwd: '/tmp',
+      coldBlankProbeMaxBytes: 1024,
+    })
 
     const response = await api.sessions.list(request({}))
     expect(response.result.ok).toBe(true)
@@ -124,11 +144,19 @@ describe('sessions.list cold merge', () => {
     })
     expect(byId['vanished']).toMatchObject({ blank: false, updatedAt: 600 })
     expect(byId['read-failure']).toMatchObject({ blank: false, updatedAt: 700 })
-    expect(readFrom).toHaveBeenCalledTimes(3)
+    // An absent cache row (e.g. a projection schema bump dropped it) is
+    // repaired by the probe fold: the list baseline carries the preview.
+    expect(byId['uncached-conversation']).toMatchObject({ blank: false, updatedAt: 1200 })
+    expect(byId['uncached-conversation']?.projections).toEqual({
+      asOfSeq: 1,
+      values: { sessionListMetadata: { blank: false, lastPromptAt: 1200, lastPromptText: 'previewed' } },
+    })
+    expect(readFrom).toHaveBeenCalledTimes(4)
     expect(readFrom.mock.calls.map(([id]) => id)).toEqual(expect.arrayContaining([
       sid('small-blank'),
       sid('small-conversation'),
       sid('read-failure'),
+      sid('uncached-conversation'),
     ]))
   })
 
@@ -155,6 +183,45 @@ describe('sessions.list cold merge', () => {
       expect.objectContaining({ sessionId: meta.id, blank: false, updatedAt: meta.createdAt }),
     ])
     expect(readFrom).not.toHaveBeenCalled()
+  })
+
+  it('reuses a memoized fold while the artifact stat identity is unchanged', async () => {
+    const ctx = new Context()
+    await ctx.plugin(SessionStore)
+    await ctx.plugin(UserQuestionService)
+    const root = mkdtempSync(join(tmpdir(), 'dsh-cold-memo-'))
+    const path = join(root, 'memo.log')
+    writeFileSync(path, 'x'.repeat(64))
+    const meta = header('memo-session', 100)
+    const readFrom = vi.fn(async () => ({
+      meta,
+      events: [
+        { type: 'turn/start', seq: 0, time: 800, data: { turn: 1 } },
+        {
+          type: 'user/message', seq: 1, time: 1200,
+          data: createUserMessage({ content: [{ type: 'text', text: 'memoized' }], source: { kind: 'user' } }),
+          surfaceOp: 'append',
+        },
+      ] as SessionEvent[],
+    }))
+    ctx.provide('sessionPersistence', {
+      list: () => Promise.resolve([meta]),
+      locate: () => ({ kind: 'jsonl', path }),
+      readFrom,
+    } as never)
+    const api = createApiProxy(ctx, { defaultModelSelection: () => ({ provider: 'p', model: 'm' }), cwd: '/tmp' })
+
+    const first = await api.sessions.list(request({}))
+    if (!first.result.ok) throw new Error('unreachable')
+    expect(first.result.value.items[0]?.projections?.values.sessionListMetadata)
+      .toMatchObject({ blank: false, lastPromptText: 'memoized' })
+    // Repeated listings must not re-read an unchanged artifact: sidebar
+    // refreshes would otherwise re-decompress every eligible cold log.
+    const second = await api.sessions.list(request({}))
+    if (!second.result.ok) throw new Error('unreachable')
+    expect(second.result.value.items[0]?.projections?.values.sessionListMetadata)
+      .toMatchObject({ blank: false, lastPromptText: 'memoized' })
+    expect(readFrom).toHaveBeenCalledOnce()
   })
 
   it('replaces a probed cold row with the live Session that attached during the read', async () => {

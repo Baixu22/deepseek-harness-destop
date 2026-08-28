@@ -206,7 +206,10 @@ describe('the new-session chip', () => {
 
     await waitFor(() => { expect(actions.load).toHaveBeenCalledTimes(1) })
     expect(screen.getByRole('button').textContent).toContain(en.presetStandardName)
-    expect(screen.getByRole('button').getAttribute('title')).toBe(en.seatHint)
+    // The hint rides the shared Tooltip primitive's focus channel, not a
+    // native title attribute.
+    fireEvent.focus(screen.getByRole('button'))
+    expect(screen.getByRole('tooltip').textContent).toBe(en.seatHint)
   })
 
   it('offers each preset with what it is for', () => {
@@ -254,7 +257,16 @@ describe('the new-session chip', () => {
   it('shows a refused switch on the trigger', () => {
     renderSeat({ error: 'session has already started' })
 
-    expect(screen.getByRole('button').getAttribute('title')).toBe('session has already started')
+    fireEvent.focus(screen.getByRole('button'))
+    expect(screen.getByRole('tooltip').textContent).toBe('session has already started')
+  })
+
+  it('withholds the hint while the menu is open', () => {
+    renderSeat()
+    fireEvent.click(screen.getByRole('button'))
+
+    fireEvent.focus(screen.getByRole('button'))
+    expect(screen.queryByRole('tooltip')).toBeNull()
   })
 
   it('renders nothing before the roster arrives or when there is none', () => {

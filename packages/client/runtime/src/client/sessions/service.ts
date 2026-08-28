@@ -717,8 +717,11 @@ export class SessionRuntime implements ISessions {
     const persisted = this.selection.getSnapshot().sessionId
     // No current (cleared, or masked gap) wipes the persisted cell — a reload
     // stays on empty; the in-memory selection still resurfaces a masked id.
+    // The pending phase is exempt: its empty list means "not pulled yet", not
+    // "session gone", so the first projection of a cold boot must not erase
+    // the startup-restore selection before the list arrives.
     if (current === undefined) {
-      if (persisted !== undefined) this.selection.set({})
+      if (persisted !== undefined && phase === 'ready') this.selection.set({})
     } else if (byId[current] !== undefined
       && (persisted !== current
         || this.selection.getSnapshot().subagentAddress?.childSessionId !== currentAddress?.childSessionId

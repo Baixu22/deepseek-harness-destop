@@ -61,7 +61,7 @@ export function Dropdown(props: {
       if (rootRef.current !== null && event.target instanceof Node && !rootRef.current.contains(event.target)) setOpen(false)
     }
     document.addEventListener('pointerdown', onDown)
-    return () => document.removeEventListener('pointerdown', onDown)
+    return () => { document.removeEventListener('pointerdown', onDown) }
   }, [open])
   const labels = props.selected
     .map(value => props.options.find(option => option.value === value)?.label ?? value)
@@ -76,14 +76,14 @@ export function Dropdown(props: {
         aria-haspopup="listbox"
         aria-expanded={open}
         aria-label={props.ariaLabel}
-        onClick={() => setOpen(value => !value)}
+        onClick={() => { setOpen(value => !value) }}
       >
-        <span className={summary === '' ? styles['ddSummary'] + ' ' + styles['ddEmpty'] : styles['ddSummary']}>{summary}</span>
+        <span className={summary === '' ? `${styles['ddSummary'] ?? ''} ${styles['ddEmpty'] ?? ''}` : styles['ddSummary']}>{summary}</span>
       </button>
       {open
         ? (
           <div className={styles['ddPanel']} role="listbox" aria-label={props.ariaLabel}>
-            {props.options.map(option => {
+            {props.options.map((option) => {
               const on = props.selected.includes(option.value)
               return (
                 <button
@@ -339,7 +339,7 @@ export function CustomProviderCard(props: CustomProviderCardProps): ReactNode {
           placeholder={t('customApiUnset')}
           ariaLabel={t('customApi')}
           disabled={profileDisabled}
-          onChange={next => setProtocol(next[0] ?? '')}
+          onChange={(next) => { setProtocol(next[0] ?? '') }}
         />
       </div>
       <div className={styles['field']}>
@@ -351,7 +351,7 @@ export function CustomProviderCard(props: CustomProviderCardProps): ReactNode {
           placeholder={t('customEffortsDefault')}
           ariaLabel={t('customEfforts')}
           disabled={profileDisabled}
-          onChange={next => setEfforts(next)}
+          onChange={(next) => { setEfforts(next) }}
         />
         <p className={styles['advancedHint']}>{t('customEffortsHint')}</p>
       </div>

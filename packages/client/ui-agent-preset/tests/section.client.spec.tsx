@@ -463,10 +463,10 @@ describe('a long card description', () => {
 
   const LONG = '始终用简体中文交流的友好通用助手，提供持久 bash 与文件编辑能力。'.repeat(8)
 
-  /** Force the clamp to report an overflow: jsdom lays nothing out, so both heights are 0. */
+  /** Force the nowrap face to report an overflow: jsdom lays nothing out, so both widths are 0. */
   function clamp(overflowing: boolean): void {
-    vi.spyOn(Element.prototype, 'scrollHeight', 'get').mockReturnValue(overflowing ? 400 : 80)
-    vi.spyOn(Element.prototype, 'clientHeight', 'get').mockReturnValue(80)
+    vi.spyOn(Element.prototype, 'scrollWidth', 'get').mockReturnValue(overflowing ? 400 : 80)
+    vi.spyOn(Element.prototype, 'clientWidth', 'get').mockReturnValue(80)
   }
 
   beforeEach(() => { vi.stubGlobal('ResizeObserver', ResizeObserverStub) })
@@ -481,7 +481,11 @@ describe('a long card description', () => {
     try {
       renderSection({ rows: [{ id: 'zh', trust: 'user', isDefault: false, name: '中文助手', description: LONG }] })
 
-      fireEvent.mouseEnter(within(rowFor('zh')).getByText(LONG))
+      // The marquee face repeats the text; the hidden measurer is the single
+      // non-repeated instance the hover bubble anchors to.
+      const measure = within(rowFor('zh')).getByText((_, el) =>
+        el?.textContent === LONG && el.className.includes('cardDescMeasure'))
+      fireEvent.mouseEnter(measure)
       act(() => { vi.advanceTimersByTime(400) })
 
       expect(screen.getByRole('tooltip').textContent).toBe(LONG)
@@ -513,7 +517,40 @@ describe('a long card description', () => {
     expect(() => {
       renderSection({ rows: [{ id: 'zh', trust: 'user', isDefault: false, description: LONG }] })
     }).not.toThrow()
-    // The first measurement does not depend on the observer.
-    expect(within(rowFor('zh')).getByText(LONG).getAttribute('title')).toBe('')
+    // The first measurement does not depend on the observer; the empty title
+    // rides the scroll wrapper so the card's own tooltip never climbs through.
+    const wrapper = rowFor('zh').querySelector('[class*="cardDescScroll"]')
+    expect(wrapper).not.toBeNull()
+    expect(wrapper?.getAttribute('title')).toBe('')
+  })
+})
+
+describe('the bento roster layout', () => {
+  it('gives every card an SVG figure and the orbit showcase to wide leads', () => {
+    renderSection({
+      rows: [
+        { id: 'standard', trust: 'system', isDefault: true },
+        { id: 'code', trust: 'system', isDefault: false },
+        { id: 'minimal', trust: 'system', isDefault: false },
+        { id: 'cordis', trust: 'system', isDefault: false },
+        { id: 'ghost', trust: 'user', isDefault: false, broken: 'agent.cordis.yml is missing' },
+        { id: 'mine', trust: 'user', isDefault: false },
+      ],
+    })
+
+    // Four built-ins, two customs, and the creator entry fill the grid.
+    expect(screen.getAllByRole('listitem')).toHaveLength(7)
+    // Every card renders its glyph figure.
+    for (const id of ['standard', 'code', 'minimal', 'cordis', 'ghost', 'mine']) {
+      expect(rowFor(id).querySelector('svg')).not.toBeNull()
+    }
+    // The orbit showcase (the 96-grid decorative ring) rides only the wide
+    // leads that are not broken; half cells and broken leads keep the glyph.
+    const orbit = (id: string) => rowFor(id).querySelectorAll('svg[viewBox="0 0 96 96"]')
+    expect(orbit('standard')).toHaveLength(1)
+    expect(orbit('cordis')).toHaveLength(1)
+    expect(orbit('code')).toHaveLength(0)
+    expect(orbit('ghost')).toHaveLength(0)
+    expect(orbit('mine')).toHaveLength(0)
   })
 })

@@ -335,6 +335,34 @@ describe('Menu', () => {
     expect(onClose).toHaveBeenCalledTimes(1)
   })
 
+  it('keeps host-owned triggers (insideRefs) out of the outside dismissal', () => {
+    const onClose = vi.fn()
+    const hostTrigger = document.createElement('button')
+    document.body.appendChild(hostTrigger)
+    try {
+      render(
+        <Menu
+          portal
+          open
+          anchor={null}
+          getAnchorRect={() => null}
+          items={items}
+          onSelect={() => {}}
+          onClose={onClose}
+          insideRefs={[{ current: hostTrigger }]}
+        />)
+      // The trigger lives outside the Menu wrapper; without insideRefs the
+      // same pointerdown would dismiss, and the host's own click would then
+      // re-open the list on one gesture.
+      fireEvent.pointerDown(hostTrigger)
+      expect(onClose).not.toHaveBeenCalled()
+      fireEvent.pointerDown(document.body)
+      expect(onClose).toHaveBeenCalledTimes(1)
+    } finally {
+      hostTrigger.remove()
+    }
+  })
+
   it('portal mode resolves align=end / side=top to clamped left/top coordinates', () => {
     render(
       <Menu portal open align="end" side="top" anchor={<span>trigger</span>} items={items} onSelect={() => {}} onClose={() => {}} />)
@@ -361,6 +389,18 @@ describe('Menu', () => {
     expect(screen.getByRole('menuitem', { name: 'Alpha' }).closest('div[class*="footer"]')).toBeNull()
     fireEvent.click(footerItem)
     expect(onSelect).toHaveBeenCalledWith('new')
+  })
+
+  it('aims the opening spring at the anchor corner (transform-origin per placement)', () => {
+    const { rerender } = render(
+      <Menu open side="right" anchor={<span>trigger</span>} items={items} onSelect={() => {}} onClose={() => {}} />)
+    expect(screen.getByRole('menu').style.transformOrigin).toBe('top left')
+    rerender(
+      <Menu open align="end" anchor={<span>trigger</span>} items={items} onSelect={() => {}} onClose={() => {}} />)
+    expect(screen.getByRole('menu').style.transformOrigin).toBe('top right')
+    rerender(
+      <Menu open side="top" anchor={<span>trigger</span>} items={items} onSelect={() => {}} onClose={() => {}} />)
+    expect(screen.getByRole('menu').style.transformOrigin).toBe('bottom left')
   })
 
   it('caps the list height for internal scrolling unless a submenu row is present', () => {

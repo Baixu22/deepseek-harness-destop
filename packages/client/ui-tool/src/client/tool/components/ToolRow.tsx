@@ -205,6 +205,7 @@ export function ToolRow({
         expandable={expandable}
         expandOnRowClick
         keepContentWhenOpen
+        morphBody
         onToggle={toggleExpand}
         collapsedContent={summaryText !== '' && (
           /* An empty summary drops the separator with it (a row that is only

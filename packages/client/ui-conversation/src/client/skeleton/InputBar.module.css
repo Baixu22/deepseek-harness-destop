@@ -108,6 +108,33 @@
   padding: 10px 12px 0;
 }
 
+/* Long-text collapse card row: shares the draft layers' horizontal padding so
+   the chip aligns with the text it stands in for. The card slides in on the
+   same decelerate curve the transcript expand uses, so a long paste and a
+   transcript reveal read as one motion language. */
+.longTextWrap {
+  display: flex;
+  padding: 0 12px 0 16px;
+  animation: longTextIn 260ms cubic-bezier(0.22, 1, 0.36, 1);
+}
+
+@keyframes longTextIn {
+  from { opacity: 0; transform: translateY(-6px); }
+  to { opacity: 1; transform: none; }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .longTextWrap {
+    animation: none;
+  }
+}
+
+/* Placeholder ghost painted by the backdrop while a collapsed draft hides;
+   the textarea's native placeholder cannot show over a non-empty value. */
+.longTextGhost {
+  color: var(--dsw-alias-label-caption);
+}
+
 /* Floating overlay anchor (menu / popupSelect shell): entries position
    themselves against the card (bottom: 100% + gap); closed entries render null. */
 .overlayAnchor {

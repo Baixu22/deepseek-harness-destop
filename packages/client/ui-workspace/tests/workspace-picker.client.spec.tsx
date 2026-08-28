@@ -218,6 +218,30 @@ describe('WorkspacePicker', () => {
     expect(screen.queryByRole('menu')).toBeNull()
   })
 
+  it('treats the host anchor as inside for the outside-click dismissal', () => {
+    const onClose = vi.fn()
+    const anchorRef = anchor()
+    document.body.appendChild(anchorRef.current)
+    try {
+      const { renderSlot } = flowProbe()
+      render(
+        <WorkspacePicker
+          open anchorRef={anchorRef} useSessions={hook(sessions)} useWorkspaces={hook(workspaceState([workspace('alpha', 'Alpha')]))}
+          onPick={vi.fn()} onClose={onClose} createWorkspace={vi.fn()}
+          useDirectoryFlow={occupancySource().useDirectoryFlow} renderSlot={renderSlot} t={t}
+        />,
+      )
+      // The host chip toggles on its own click; a dismissal racing that click
+      // would reopen the list on the same gesture.
+      fireEvent.pointerDown(anchorRef.current)
+      expect(onClose).not.toHaveBeenCalled()
+      fireEvent.pointerDown(document.body)
+      expect(onClose).toHaveBeenCalledTimes(1)
+    } finally {
+      anchorRef.current.remove()
+    }
+  })
+
   it('keeps the menu up while the list baseline is still in flight', () => {
     const state: WorkspaceListState = {
       ...workspaceState([]), phase: 'pending', state: 'loading', baselinesReady: false,

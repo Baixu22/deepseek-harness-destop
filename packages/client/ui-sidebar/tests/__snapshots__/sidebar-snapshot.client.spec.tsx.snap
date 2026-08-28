@@ -48,7 +48,8 @@ exports[`sidebar shell snapshots > renders the collapsed rail after the crossfad
     </div>
     <button
       aria-label="New session"
-      class="newSession"
+      class="liquid newSession"
+      style="--liquid-delay: 0.3s; --liquid-fill-height: 3px; --liquid-hover-scale: 1.05; --liquid-tap-scale: 0.95;"
       type="button"
     >
       <svg
@@ -169,7 +170,8 @@ exports[`sidebar shell snapshots > renders the expanded column (wordmark, capsul
     </div>
     <button
       aria-label="New session"
-      class="newSession"
+      class="liquid newSession"
+      style="--liquid-delay: 0.3s; --liquid-fill-height: 3px; --liquid-hover-scale: 1.05; --liquid-tap-scale: 0.95;"
       type="button"
     >
       <svg
@@ -295,7 +297,8 @@ exports[`sidebar shell snapshots > renders the expanded column in the default lo
     </div>
     <button
       aria-label="新建会话"
-      class="newSession"
+      class="liquid newSession"
+      style="--liquid-delay: 0.3s; --liquid-fill-height: 3px; --liquid-hover-scale: 1.05; --liquid-tap-scale: 0.95;"
       type="button"
     >
       <svg

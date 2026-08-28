@@ -43,6 +43,14 @@ export const WINDOW_CONTROLS_CSS = `
   background: #c42b1c;
   color: #ffffff;
 }
+
+/* The frameless shell owns the top-right corner: push the welcome-phase
+   workspace composer stack down so it keeps clear of the 38px control
+   strip and the panel cluster pinned beneath it. The substring attribute
+   selector survives the app bundle's CSS-module hash. */
+[data-phase="hero"] [class*="composerStack"] {
+  margin-top: 28px;
+}
 `
 
 export function createWindowControlsMarkup() {

@@ -213,6 +213,7 @@ describe('session.history projections block', () => {
     expect(after.result.value.projections?.values.sessionListMetadata).toEqual({
       blank: true,
       lastPromptAt: session.events.at(-1)?.time,
+      lastPromptText: 'm0',
     })
   })
 
@@ -225,7 +226,7 @@ describe('session.history projections block', () => {
     await fiber.await()
     await vi.waitFor(() => {
       expect(ctx.sessionProjections.snapshot(session).values.sessionListMetadata)
-        .toEqual({ blank: true, lastPromptAt: null })
+        .toEqual({ blank: true, lastPromptAt: null, lastPromptText: null })
     })
     await fiber.dispose()
     expect('sessionListMetadata' in ctx.sessionProjections.snapshot(session).values).toBe(false)
@@ -247,6 +248,7 @@ describe('session.list projections column', () => {
     expect(row?.projections?.values.sessionListMetadata).toEqual({
       blank: false,
       lastPromptAt: session.events.at(-1)?.time,
+      lastPromptText: 'm0',
     })
     expect(row?.projections?.asOfSeq).toBe(session.seq - 1)
   })
@@ -361,9 +363,9 @@ describe('session/projection push frame', () => {
       (f): f is Extract<MuxFrame, { type: 'session/projection' }> =>
         f.type === 'session/projection' && f.key === 'sessionListMetadata',
     )).toEqual([
-      { type: 'session/projection', sessionId: session.id, key: 'sessionListMetadata', value: { blank: true, lastPromptAt: 100 }, seq: 0 },
-      { type: 'session/projection', sessionId: session.id, key: 'sessionListMetadata', value: { blank: false, lastPromptAt: 100 }, seq: 1 },
-      { type: 'session/projection', sessionId: session.id, key: 'sessionListMetadata', value: { blank: false, lastPromptAt: 300 }, seq: 2 },
+      { type: 'session/projection', sessionId: session.id, key: 'sessionListMetadata', value: { blank: true, lastPromptAt: 100, lastPromptText: 'm0' }, seq: 0 },
+      { type: 'session/projection', sessionId: session.id, key: 'sessionListMetadata', value: { blank: false, lastPromptAt: 100, lastPromptText: 'm0' }, seq: 1 },
+      { type: 'session/projection', sessionId: session.id, key: 'sessionListMetadata', value: { blank: false, lastPromptAt: 300, lastPromptText: 'm0' }, seq: 2 },
     ])
     // Frame seq aligns with the tail block's asOfSeq vocabulary (higher-seq-wins compatible).
     const tail = await proxy.sessions.history(request({ sessionId: session.id }))

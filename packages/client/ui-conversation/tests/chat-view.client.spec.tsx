@@ -1104,12 +1104,15 @@ describe('ChatView', () => {
     const scroller = view.container.querySelector('[class*="scroll"]') as HTMLDivElement
     Object.defineProperty(scroller, 'scrollHeight', { value: 800, writable: true })
     Object.defineProperty(scroller, 'clientHeight', { value: 200, writable: true })
-    readerScroll(scroller, 50)
+    // One viewport from the floor: the instant path (the glide has its own test).
+    readerScroll(scroller, 400)
     fireEvent.click(view.getByText('加载更早'))
     fireEvent.click(view.getByLabelText('回到底部'))
-    Object.defineProperty(scroller, 'scrollHeight', { value: 1_300, writable: true })
+    // The prepended growth stays within one viewport of the pinned floor,
+    // so the follow jump remains instant too.
+    Object.defineProperty(scroller, 'scrollHeight', { value: 1_200, writable: true })
     act(() => { h.set({ nodes: [assistant(2, 'older'), user(9, 'late')] }) })
-    expect(scroller.scrollTop).toBe(1_300)
+    expect(scroller.scrollTop).toBe(1_200)
     expect(h.chatScroll.read()).toBeNull()
   })
 
@@ -1119,16 +1122,37 @@ describe('ChatView', () => {
     const scroller = view.container.querySelector('[class*="scroll"]') as HTMLDivElement
     Object.defineProperty(scroller, 'scrollHeight', { value: 1000, writable: true })
     Object.defineProperty(scroller, 'clientHeight', { value: 300, writable: true })
-    readerScroll(scroller, 100) // far from bottom
+    // Far from bottom but one viewport away: the instant path.
+    readerScroll(scroller, 400)
     const backButton = view.getByLabelText('回到底部')
     expect(backButton).toBeTruthy()
     // Streaming growth must NOT drag a scrolled-away reader down.
     act(() => { h.set({ partial: { turn: 1, step: 1, blocks: [{ kind: 'text', text: 'grow' }] } }) })
-    expect(scroller.scrollTop).toBe(100)
+    expect(scroller.scrollTop).toBe(400)
     fireEvent.click(backButton)
     expect(scroller.scrollTop).toBe(1000)
     // At the bottom again: follow re-arms and the button unmounts.
     expect(view.queryByLabelText('回到底部')).toBeNull()
+  })
+
+  it('a long back-to-bottom ride glides past one viewport instead of teleporting', async () => {
+    const h = makeHarness({ nodes: [user(1, 'q'), assistant(2, 'a')] })
+    const view = render(<h.ChatView {...h.props} />)
+    const scroller = view.container.querySelector('[class*="scroll"]') as HTMLDivElement
+    Object.defineProperty(scroller, 'scrollHeight', { value: 4000, writable: true })
+    Object.defineProperty(scroller, 'clientHeight', { value: 400, writable: true })
+    readerScroll(scroller, 100) // far from bottom
+    fireEvent.click(view.getByLabelText('回到底部'))
+    // Ownership settles exactly like the instant jump...
+    expect(view.queryByLabelText('回到底部')).toBeNull()
+    // ...while the ride itself animates: an intermediate frame lands between
+    // the start and the floor, then the glide settles on the floor.
+    await waitFor(() => { expect(scroller.scrollTop).toBeGreaterThan(100) })
+    expect(scroller.scrollTop).toBeLessThan(3600)
+    await waitFor(() => { expect(scroller.scrollTop).toBe(3600) })
+    // Reader input mid-ride takes over: the glide must not keep writing.
+    readerScroll(scroller, 500)
+    expect(scroller.scrollTop).toBe(500)
   })
 
   it('keeps following when a stream-finalization shrink clamp delivers its scroll', () => {
@@ -1148,9 +1172,9 @@ describe('ChatView', () => {
     expect(view.queryByLabelText('回到底部')).toBeNull()
     expect(h.chatScroll.read()).toBeNull()
 
-    metrics.setHeight(1_200)
+    metrics.setHeight(1_050)
     act(() => { h.set({ running: true }) })
-    expect(scroller.scrollTop).toBe(900)
+    expect(scroller.scrollTop).toBe(750)
   })
 
   it('uses the last delivered top when compositor scrolling precedes scroll delivery', () => {
@@ -1223,7 +1247,8 @@ describe('ChatView', () => {
       const view = render(<h.ChatView {...h.props} />, { container: host })
       // Open jump uses the host, not the local .scroll node.
       expect(host.scrollTop).toBe(2000)
-      readerScroll(host, 100)
+      // One viewport from the floor: the instant path.
+      readerScroll(host, 1000)
       expect(view.getByLabelText('回到底部')).toBeTruthy()
       fireEvent.click(view.getByLabelText('回到底部'))
       expect(host.scrollTop).toBe(2000)

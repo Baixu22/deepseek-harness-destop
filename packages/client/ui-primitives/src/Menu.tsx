@@ -7,11 +7,15 @@
 // Entries also cover non-interactive `label` headings and `danger` rows.
 // Lists keep 12px clearance to the viewport's top/bottom edges and scroll
 // internally past that; submenu-bearing menus are exempt (see .scrollable).
+// Opening rides an animate-ui-popover-style spring (scale + fade out of the
+// anchor corner the list is pinned to); closing stays instant — the list
+// unmounts with the owner's state.
 
 import { useEffect, useLayoutEffect, useRef, useState } from 'react'
-import type { CSSProperties, ReactNode } from 'react'
+import type { CSSProperties, ReactNode, RefObject } from 'react'
 import { createPortal } from 'react-dom'
 import clsx from 'clsx'
+import { motion, useReducedMotion, type MotionStyle } from 'motion/react'
 import { IconCheckOutline16 } from './icons/index.tsx'
 import { usePointerGrace } from './pointer-grace.ts'
 import css from './Menu.module.css'
@@ -83,11 +87,15 @@ const MEASURE_STYLE: CSSProperties = { visibility: 'hidden', left: 0, top: 0 }
  * the trigger (render-prop anchors, effect-positioned proxies — measuring the
  * wrapper there races the host's layout effects). Called on open and on every
  * scroll/resize; return null to skip placement for that frame.
+ * @param props.insideRefs - extra elements treated as inside for the outside-click
+ * dismissal: host-owned triggers rendered OUTSIDE the Menu wrapper (the
+ * anchor={null} + getAnchorRect flow) toggle their own open state on click, so
+ * a dismissal racing that click would reopen the list on the same gesture.
  * @param props.footer - rows pinned below the scrolling items area, separated
  * by a hairline; they stay visible while the items above scroll.
  * @returns anchor wrapper with the conditional list.
  */
-export function Menu({ open, anchor, items, selectedId, selectedIds, onSelect, onClose, align = 'start', side = 'bottom', portal = false, closeOnPointerLeave = false, dense = false, compact = false, getAnchorRect, footer, className }: {
+export function Menu({ open, anchor, items, selectedId, selectedIds, onSelect, onClose, align = 'start', side = 'bottom', portal = false, closeOnPointerLeave = false, dense = false, compact = false, getAnchorRect, insideRefs, footer, className }: {
   open: boolean
   anchor: ReactNode
   items: readonly MenuEntry[]
@@ -103,6 +111,7 @@ export function Menu({ open, anchor, items, selectedId, selectedIds, onSelect, o
   dense?: boolean
   compact?: boolean
   getAnchorRect?: () => DOMRect | null
+  insideRefs?: ReadonlyArray<RefObject<HTMLElement | null>>
   className?: string
 }) {
   const rootRef = useRef<HTMLSpanElement>(null)
@@ -110,6 +119,10 @@ export function Menu({ open, anchor, items, selectedId, selectedIds, onSelect, o
   const [openSubmenuId, setOpenSubmenuId] = useState<string | null>(null)
   const [fixedPos, setFixedPos] = useState<CSSProperties | null>(null)
   const { arm: armClose, cancel: cancelClose } = usePointerGrace(onClose)
+  // Read at event time so the listener effect below keeps stable deps while
+  // hosts pass a fresh array literal each render.
+  const insideRefsRef = useRef(insideRefs)
+  insideRefsRef.current = insideRefs
 
   // Portal mode: fixed-position the list from the anchor rect before paint;
   // track the anchor while open (capture-phase scroll catches nested panes).
@@ -171,9 +184,13 @@ export function Menu({ open, anchor, items, selectedId, selectedIds, onSelect, o
     }
     const onPointerDown = (e: PointerEvent) => {
       if (!(e.target instanceof Node)) return
+      const target = e.target
       // The portaled list is outside the anchor subtree; check both.
-      if (rootRef.current?.contains(e.target) === true) return
-      if (listRef.current?.contains(e.target) === true) return
+      if (rootRef.current?.contains(target) === true) return
+      if (listRef.current?.contains(target) === true) return
+      // Host-owned triggers outside the wrapper toggle themselves on click;
+      // dismissing here would race that toggle back open on the same gesture.
+      if (insideRefsRef.current?.some(ref => ref.current?.contains(target) === true) === true) return
       onClose()
     }
     const onKeyDown = (e: KeyboardEvent) => {
@@ -258,20 +275,30 @@ export function Menu({ open, anchor, items, selectedId, selectedIds, onSelect, o
     )
   }
 
+  // The opening spring scales out of the anchor corner the list is pinned to
+  // (animate-ui popover family); reduced motion keeps a plain fade.
+  const reduceMotion = useReducedMotion()
+  const origin = side === 'right'
+    ? 'top left'
+    : `${side === 'top' ? 'bottom' : 'top'} ${align === 'end' ? 'right' : 'left'}`
+
   // Portal lists render hidden until placed: the placement effect measures
   // this pre-render in the same commit, so the first painted frame is
   // already at the final position (with getAnchorRect returning null the
   // list simply stays hidden).
   const list = open && (
-    <div
+    <motion.div
       ref={listRef}
       className={clsx(css.list, dense && css.denseList, compact && css.compactList, scrollable && css.scrollable, portal && css.portal, side === 'top' && !portal && css.sideTop, align === 'end' && !portal && css.alignEnd)}
-      style={portal ? fixedPos ?? MEASURE_STYLE : undefined}
+      style={{ ...(portal ? fixedPos ?? MEASURE_STYLE : undefined), transformOrigin: origin } as MotionStyle}
       role="menu"
       // React portals bubble synthetic events through the REACT tree: without
       // this stop, an item click re-fires the anchor row's own onClick
       // (open/toggle) after onSelect.
       onClick={(e) => { e.stopPropagation() }}
+      initial={reduceMotion ? { opacity: 0 } : { opacity: 0, scale: 0.5 }}
+      animate={reduceMotion ? { opacity: 1 } : { opacity: 1, scale: 1 }}
+      transition={reduceMotion ? { duration: 0.15 } : { type: 'spring', stiffness: 300, damping: 25 }}
     >
       <div className={css.viewport} role="presentation">
         {items.map(renderEntry)}
@@ -281,7 +308,7 @@ export function Menu({ open, anchor, items, selectedId, selectedIds, onSelect, o
           {footer.map(renderEntry)}
         </div>
       )}
-    </div>
+    </motion.div>
   )
 
   // Pointer-leave dismissal watches the WRAPPER, not the list: React's

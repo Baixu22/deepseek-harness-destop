@@ -25,6 +25,8 @@ type WorkspaceViewState = {
   sessionOrderByAccount: Record<string, string[]>
   /** Last observed update timestamps per order account for one-time promotion events. */
   sessionUpdatedAtByAccount: Record<string, Record<string, number>>
+  /** Pinned session ids in pin order; the pinned section renders them topmost. */
+  pinnedSessionIds: string[]
 }
 
 /**
@@ -43,6 +45,8 @@ type WorkspaceViewActions = {
     updatedAt: Record<string, number>,
   ) => void
   setSessionOrder: (draft: WorkspaceViewState, accountKey: string, order: string[]) => void
+  /** Toggle one session's pin membership; pin order is the toggle-on order. */
+  setSessionPinned: (draft: WorkspaceViewState, sessionId: string, pinned: boolean) => void
 }
 
 /**
@@ -57,8 +61,9 @@ export function createWorkspaceViewStore(): EngineStoreHandle<WorkspaceViewState
       groupExpansion: {},
       sessionOrderByAccount: {},
       sessionUpdatedAtByAccount: {},
+      pinnedSessionIds: [],
     }),
-    persist: 'dsh.workspace.view.v5',
+    persist: 'dsh.workspace.view.v6',
     actions: {
       setGroupBy: (d, mode: SessionGroupBy) => { d.groupBy = mode },
       setOrderBy: (d, mode: SessionOrderBy) => { d.orderBy = mode },
@@ -81,6 +86,11 @@ export function createWorkspaceViewStore(): EngineStoreHandle<WorkspaceViewState
       },
       setSessionOrder: (d, accountKey: string, order: string[]) => {
         d.sessionOrderByAccount[accountKey] = order
+      },
+      setSessionPinned: (d, sessionId: string, pinned: boolean) => {
+        d.pinnedSessionIds = pinned
+          ? [...d.pinnedSessionIds.filter(id => id !== sessionId), sessionId]
+          : d.pinnedSessionIds.filter(id => id !== sessionId)
       },
     },
   })

@@ -1,9 +1,20 @@
 // @vitest-environment jsdom
-import { act, cleanup, fireEvent, render, screen } from '@testing-library/react'
+// jsdom never paints, so motion's springs would only settle on their own
+// clock; skipAnimations makes entrances/exits jump to their end state, and
+// the removal assertions await the AnimatePresence exit flush.
+import { MotionGlobalConfig } from 'motion'
+import { act, cleanup, fireEvent, render, screen, waitFor } from '@testing-library/react'
 import { afterEach, describe, expect, it, vi } from 'vitest'
 import { Tooltip } from '@deepseek-ai/dsh-client-ui-primitives'
 
+MotionGlobalConfig.skipAnimations = true
+
 afterEach(cleanup)
+
+/** Await the bubble's animated unmount (exit settles within one skipped frame). */
+const expectGone = async () => {
+  await waitFor(() => { expect(screen.queryByRole('tooltip')).toBeNull() })
+}
 
 describe('Tooltip', () => {
   it('resolves lazy labels only after the bubble becomes visible', () => {
@@ -53,7 +64,7 @@ describe('Tooltip', () => {
     }
   })
 
-  it('shows the bubble to the right on hover and hides it on leave', () => {
+  it('shows the bubble to the right on hover and hides it on leave', async () => {
     render(
       <Tooltip label="Open sidebar">
         <button type="button">anchor</button>
@@ -69,10 +80,10 @@ describe('Tooltip', () => {
     expect(bubble.style.left).toBe('22px')
     expect(bubble.style.top).toBe('0px')
     fireEvent.mouseLeave(anchor)
-    expect(screen.queryByRole('tooltip')).toBeNull()
+    await expectGone()
   })
 
-  it('supports bottom placement and the focus/blur channel', () => {
+  it('supports bottom placement and the focus/blur channel', async () => {
     render(
       <Tooltip label="Below" side="bottom">
         <button type="button">anchor</button>
@@ -86,7 +97,7 @@ describe('Tooltip', () => {
     expect(bubble.style.left).toBe('12px')
     expect(bubble.style.top).toBe('8px')
     fireEvent.blur(anchor)
-    expect(screen.queryByRole('tooltip')).toBeNull()
+    await expectGone()
   })
 
   // jsdom's default rects are all-zero, so the clamp tests stub the measured
@@ -257,6 +268,23 @@ describe('Tooltip', () => {
     }
   })
 
+  it('keeps the arrow aiming at the anchor after a horizontal clamp', () => {
+    const spy = vi.spyOn(Element.prototype, 'getBoundingClientRect').mockReturnValue(rect(900, 1100))
+    try {
+      render(
+        <Tooltip label="Wide" side="bottom">
+          <button type="button">anchor</button>
+        </Tooltip>,
+      )
+      fireEvent.mouseEnter(screen.getByText('anchor'))
+      // The clamp shifted the bubble 88px left; the arrow counter-shifts by
+      // the same distance through --tip-dx.
+      expect(screen.getByRole('tooltip').style.getPropertyValue('--tip-dx')).toBe('-88px')
+    } finally {
+      spy.mockRestore()
+    }
+  })
+
   it('chains the anchor\'s own handlers ahead of the tooltip\'s', () => {
     const onMouseEnter = vi.fn()
     const onMouseLeave = vi.fn()
@@ -298,7 +326,7 @@ describe('Tooltip', () => {
     expect(screen.getByRole('tooltip')).toBeTruthy()
   })
 
-  it('mouse leave hides the bubble immediately, even while the anchor stays focused', () => {
+  it('mouse leave hides the bubble immediately, even while the anchor stays focused', async () => {
     render(
       <Tooltip label="Sticky">
         <button type="button">anchor</button>
@@ -309,13 +337,13 @@ describe('Tooltip', () => {
     fireEvent.focus(anchor)
     fireEvent.mouseEnter(anchor)
     fireEvent.mouseLeave(anchor)
-    expect(screen.queryByRole('tooltip')).toBeNull()
+    await expectGone()
     // Re-entering shows it again; blurring while still hovered keeps it.
     fireEvent.mouseEnter(anchor)
     fireEvent.blur(anchor)
     expect(screen.getByRole('tooltip')).toBeTruthy()
     fireEvent.mouseLeave(anchor)
-    expect(screen.queryByRole('tooltip')).toBeNull()
+    await expectGone()
   })
 
   it('forwards the anchor element to the child ref (object and callback)', () => {
@@ -338,7 +366,7 @@ describe('Tooltip', () => {
     expect(callbackRef).toHaveBeenCalledWith(screen.getByText('anchor'))
   })
 
-  it('drops an already-visible bubble when disabled flips mid-hover', () => {
+  it('drops an already-visible bubble when disabled flips mid-hover', async () => {
     const { rerender } = render(
       <Tooltip label="Rail">
         <button type="button">anchor</button>
@@ -352,6 +380,6 @@ describe('Tooltip', () => {
         <button type="button">anchor</button>
       </Tooltip>,
     )
-    expect(screen.queryByRole('tooltip')).toBeNull()
+    await expectGone()
   })
 })

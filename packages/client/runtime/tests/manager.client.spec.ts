@@ -163,6 +163,65 @@ describe('list lifecycle', () => {
     expect(manager.getListSnapshot().phase).toBe('pending')
   })
 
+  it('backoff retry re-pulls a failed baseline until it lands', async () => {
+    vi.useFakeTimers()
+    try {
+      const api = new FakeApiClient()
+      let pulls = 0
+      api.onList = () => {
+        pulls += 1
+        return pulls === 1
+          ? Promise.resolve(err({ code: 'internal', message: 'route not ready', details: {} }))
+          : Promise.resolve(ok({ items: [] as never[] }))
+      }
+      const manager = new SessionManager(api, fakeRemote())
+      await manager.refreshList()
+      expect(manager.getListSnapshot()).toMatchObject({ state: 'error', phase: 'pending' })
+      await vi.advanceTimersByTimeAsync(1000)
+      expect(manager.getListSnapshot()).toMatchObject({ state: 'idle', phase: 'ready' })
+      expect(api.callsOf('session.list')).toHaveLength(2)
+    } finally {
+      vi.useRealTimers()
+    }
+  })
+
+  it('a caller-driven refresh consumes the pending backoff retry', async () => {
+    vi.useFakeTimers()
+    try {
+      const api = new FakeApiClient()
+      api.onList = () => Promise.resolve(err({ code: 'internal', message: 'not found', details: {} }))
+      const manager = new SessionManager(api, fakeRemote())
+      await manager.refreshList()
+      api.onList = () => Promise.resolve(ok({ items: [] as never[] }))
+      await manager.refreshList()
+      expect(manager.getListSnapshot()).toMatchObject({ state: 'idle', phase: 'ready' })
+      expect(api.callsOf('session.list')).toHaveLength(2)
+      // The cancelled backoff timer must not fire a third pull.
+      await vi.advanceTimersByTimeAsync(60_000)
+      expect(api.callsOf('session.list')).toHaveLength(2)
+    } finally {
+      vi.useRealTimers()
+    }
+  })
+
+  it('stops scheduling retries after six failed backoff attempts', async () => {
+    vi.useFakeTimers()
+    try {
+      const api = new FakeApiClient()
+      api.onList = () => Promise.resolve(err({ code: 'internal', message: 'down', details: {} }))
+      const manager = new SessionManager(api, fakeRemote())
+      await manager.refreshList()
+      // Initial pull + six backoff retries (1s, 2s, 4s, 8s, 15s, 15s), then the cap holds.
+      await vi.advanceTimersByTimeAsync(60_000)
+      expect(api.callsOf('session.list')).toHaveLength(7)
+      await vi.advanceTimersByTimeAsync(60_000)
+      expect(api.callsOf('session.list')).toHaveLength(7)
+      expect(manager.getListSnapshot()).toMatchObject({ state: 'error', phase: 'pending' })
+    } finally {
+      vi.useRealTimers()
+    }
+  })
+
   it('phase steps pending → ready on the first successful pull and never returns', async () => {
     const api = new FakeApiClient()
     const manager = new SessionManager(api, fakeRemote())

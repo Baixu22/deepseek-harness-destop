@@ -1,15 +1,19 @@
-// Hover/focus label bubble (figma tooltip pill: dark plate, white text).
-// TODO: interaction is a placeholder (horizontal overflow clamps and a
-// vertical collision flips the bubble to the other side, but there is no
-// arrow) — visuals and behavior get a proper pass later.
+// Hover/focus label bubble (figma tooltip pill: dark plate, white text) with
+// an animate-ui-style spring entrance: the plate pops out of the anchor
+// edge (scale + a small slide from the anchor side, spring settle) and
+// carries a corner-rounded arrow that keeps pointing at the anchor even when
+// the fit pass clamps the bubble back inside the viewport.
 // The anchor is the child element itself (cloneElement, no wrapper node), so
-// attaching a tooltip never changes the anchor's layout context. The bubble is
-// position:fixed and coordinates come from the anchor's rect at show time, so
-// it escapes ancestor overflow clipping (the sidebar rail clips its column)
-// without a portal.
+// attaching a tooltip never changes the anchor's layout context. The bubble
+// is position:fixed and coordinates come from the anchor's rect at show
+// time, so it escapes ancestor overflow clipping (the sidebar rail clips its
+// column) without a portal. The plate is a motion child INSIDE the fixed
+// outer span: the outer owns the centering transform, the plate owns the
+// animated transform, and the two never fight.
 
 import { cloneElement, useCallback, useEffect, useLayoutEffect, useRef, useState } from 'react'
 import type { FocusEventHandler, MouseEventHandler, MutableRefObject, ReactElement, Ref } from 'react'
+import { AnimatePresence, motion, useReducedMotion } from 'motion/react'
 import css from './Tooltip.module.css'
 
 /** Bubble placement relative to the anchor. */
@@ -25,6 +29,12 @@ interface AnchorProps {
 }
 
 type TooltipLabel = string | (() => string)
+
+/** Spring for the plate pop; exit rides a short fade instead. */
+const SHOW_SPRING = { type: 'spring', stiffness: 420, damping: 26, mass: 0.8 } as const
+
+/** Entrance offset starts the plate a few px inside the anchor edge. */
+const SHOW_OFFSET = 6
 
 /**
  * Attach a hover/focus tooltip to an anchor element.
@@ -55,6 +65,7 @@ export function Tooltip({ label, side = 'right', delayMs = 0, disabled = false, 
   // viewport refuses it.
   const [placement, setPlacement] = useState<TooltipSide>(side)
   const bubble = useRef<HTMLSpanElement | null>(null)
+  const reduceMotion = useReducedMotion()
   const resolvedLabel = pos === null
     ? null
     : typeof label === 'function' ? label() : label
@@ -70,7 +81,8 @@ export function Tooltip({ label, side = 'right', delayMs = 0, disabled = false, 
   // inside; vertically it flips to the opposite side, which is the only move
   // that does not cover the anchor being read. Each measurement resets the base
   // position first, so a shorter label or a larger viewport releases a previous
-  // adjustment without another render.
+  // adjustment without another render. The clamp distance is published as
+  // --tip-dx so the arrow slides with the bubble and still aims at the anchor.
   useLayoutEffect(() => {
     if (pos === null) return
     const fit = () => {
@@ -78,11 +90,13 @@ export function Tooltip({ label, side = 'right', delayMs = 0, disabled = false, 
       /* v8 ignore next -- pos is set only while the bubble is mounted. */
       if (el === null) return
       el.style.left = `${pos.x}px`
+      el.style.setProperty('--tip-dx', '0px')
       const r = el.getBoundingClientRect()
       let dx = 0
       if (r.right > window.innerWidth - EDGE_MARGIN) dx = window.innerWidth - EDGE_MARGIN - r.right
       if (r.left + dx < EDGE_MARGIN) dx = EDGE_MARGIN - r.left
       el.style.left = `${pos.x + dx}px`
+      el.style.setProperty('--tip-dx', `${dx}px`)
       if (side === 'right') return
       // Flip only into a side that genuinely fits, so an anchor with room on
       // neither side keeps the requested placement instead of oscillating.
@@ -143,6 +157,11 @@ export function Tooltip({ label, side = 'right', delayMs = 0, disabled = false, 
     if (!triggers.current.hover && !triggers.current.focus) setPos(null)
   }
 
+  // The plate pops out of the anchor edge it belongs to: the transform origin
+  // sits on that edge and the entrance slides the last few px from it.
+  const origin = placement === 'right' ? 'left center' : placement === 'bottom' ? 'center top' : 'center bottom'
+  const hiddenOffset = placement === 'right' ? { x: -SHOW_OFFSET, y: 0 } : placement === 'bottom' ? { x: 0, y: -SHOW_OFFSET } : { x: 0, y: SHOW_OFFSET }
+
   return (
     <>
       {cloneElement(children, {
@@ -152,17 +171,31 @@ export function Tooltip({ label, side = 'right', delayMs = 0, disabled = false, 
         onFocus: (e) => { children.props.onFocus?.(e); triggers.current.focus = true; cancelShow(); show() },
         onBlur: (e) => { children.props.onBlur?.(e); triggers.current.focus = false; hide() },
       })}
-      {pos !== null && (
-        <span
-          ref={bubble}
-          className={css.bubble}
-          data-side={placement}
-          style={{ left: pos.x, top: y, ...maxWidth === undefined ? {} : { maxWidth } }}
-          role="tooltip"
-        >
-          {resolvedLabel}
-        </span>
-      )}
+      <AnimatePresence>
+        {pos !== null && (
+          <span
+            key="tooltip-bubble"
+            ref={bubble}
+            className={css.bubble}
+            data-side={placement}
+            style={{ left: pos.x, top: y, ...maxWidth === undefined ? {} : { maxWidth } }}
+            role="tooltip"
+          >
+            <motion.span
+              className={css.plate}
+              data-side={placement}
+              style={{ ...(maxWidth === undefined ? {} : { maxWidth }), transformOrigin: origin }}
+              initial={reduceMotion ? { opacity: 0 } : { opacity: 0, scale: 0.6, ...hiddenOffset }}
+              animate={reduceMotion ? { opacity: 1 } : { opacity: 1, scale: 1, x: 0, y: 0 }}
+              exit={reduceMotion ? { opacity: 0 } : { opacity: 0, scale: 0.75, transition: { duration: 0.12, ease: 'easeOut' } }}
+              transition={SHOW_SPRING}
+            >
+              {resolvedLabel}
+              <span className={css.arrow} data-side={placement} aria-hidden="true" />
+            </motion.span>
+          </span>
+        )}
+      </AnimatePresence>
     </>
   )
 }

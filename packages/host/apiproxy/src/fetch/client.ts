@@ -410,7 +410,11 @@ export abstract class AbstractApiClient implements IApiClient {
   // ---- IApiClient API (arrow properties so destructured/passed references stay bound) ----
 
   readonly sessions: IApiClient['sessions'] = {
-    list: (payload, signal) => this.callUnary('session.list', payload, signal),
+    // Cold boot hydrates the session store inside this handler (observed 36s
+    // first pull); the shared unary deadline would abort the boot baseline
+    // pull before hydration finishes, so it rides only caller/connection
+    // cancellation, like the other boot-paced calls.
+    list: (payload, signal) => this.callUnary('session.list', payload, signal, 'caller-signal-only'),
     search: (payload, signal) => this.callUnary('session.search', payload, signal),
     create: (payload, signal) => this.callUnary('session.create', payload, signal),
     history: (payload, signal) => this.callUnary('session.history', payload, signal),

@@ -3,13 +3,15 @@
 // assistant answers), pending steering (copy only), context injection,
 // compaction marker, retry disclosure, and unknown-surface JSON rows.
 
-import { memo, useEffect, useMemo, useState } from 'react'
+import { memo, useEffect, useLayoutEffect, useMemo, useRef, useState } from 'react'
 import type { ReactNode } from 'react'
+import clsx from 'clsx'
 import type {
   ModelRetryNode, TurnErrorNode, UserMessageNode,
 } from '@deepseek-ai/dsh-client-runtime/client'
-import { JsonBlock, MessageText, StateDot } from '@deepseek-ai/dsh-client-ui-primitives'
+import { JsonBlock, MarkdownText, MessageText, StateDot } from '@deepseek-ai/dsh-client-ui-primitives'
 import type { ChatNodeOwnerProps, ChatNodeViewProps, ChatViewSlotProps } from '../contract/slots.ts'
+import { LongTextCard, isLongText } from './LongTextCard.tsx'
 import { ReferenceIcon } from '../reference/ReferenceIcon.tsx'
 import { CompactionItem } from './CompactionItem.tsx'
 import { ContextInjectionRow } from './ContextInjectionRow.tsx'
@@ -229,14 +231,114 @@ function UserStyleBubble({
   const { text, images, rest } = contentParts(content)
   const truncated = (total: number): string => t('json.truncated', { total })
   const showBubble = text !== '' || rest.length > 0
+  // Long pasted messages collapse into the document card (the composer's
+  // paste chip seen from the transcript side) and expand in place to their
+  // markdown rendering. Pure-text messages only: a bubble carrying extra
+  // content blocks keeps its regular rendering.
+  const [expanded, setExpanded] = useState(false)
+  const longText = rest.length === 0 && isLongText(text)
+  // One-panel morph sizing: the clipping container transitions between the
+  // card's and the bubble's measured heights (CSS cannot interpolate to
+  // `auto`). `null` until the first measurement keeps the container on
+  // content-driven height with no transition, so mounting never animates.
+  const cardRef = useRef<HTMLDivElement>(null)
+  const bubbleRef = useRef<HTMLDivElement>(null)
+  const [dims, setDims] = useState<{ card: number; bubble: number } | null>(null)
+  useLayoutEffect(() => {
+    const card = cardRef.current
+    const bubble = bubbleRef.current
+    if (!longText || card === null || bubble === null) return
+    const sync = (): void => {
+      const next = { card: card.offsetHeight, bubble: bubble.offsetHeight }
+      setDims(prev => (prev !== null && prev.card === next.card && prev.bubble === next.bubble ? prev : next))
+    }
+    const observer = new ResizeObserver(sync)
+    observer.observe(card)
+    observer.observe(bubble)
+    sync()
+    return () => { observer.disconnect() }
+  }, [longText, text])
+  // Collapse lives at the bubble's bottom while the card sits at the panel's
+  // top, so mid-transcript the shrinking morph would play off-screen and the
+  // browser's own scroll anchoring lands the card above the viewport. Two
+  // cases, never mixed: while the reader is pinned to the bottom, ChatView's
+  // bottom-follow already owns every frame and nothing is written here; any
+  // other position, this loop carries the card to the middle of the viewport
+  // and then holds it there, correcting only when the card drifts out of the
+  // band so it never fights the browser anchor or ChatView frame by frame.
+  const morphRef = useRef<HTMLDivElement>(null)
+  const followFrame = useRef<number | undefined>(undefined)
+  useEffect(() => () => {
+    if (followFrame.current !== undefined) cancelAnimationFrame(followFrame.current)
+  }, [])
+  const collapseToCard = (): void => {
+    const panel = morphRef.current
+    setExpanded(false)
+    if (panel === null) return
+    let scroller: HTMLElement | null = panel.parentElement
+    while (scroller !== null) {
+      const oy = getComputedStyle(scroller).overflowY
+      if ((oy === 'auto' || oy === 'scroll') && scroller.scrollHeight > scroller.clientHeight) break
+      scroller = scroller.parentElement
+    }
+    if (scroller === null) return
+    const scrollerEl: HTMLElement = scroller
+    if (scrollerEl.scrollHeight - scrollerEl.scrollTop - scrollerEl.clientHeight <= 8) return
+    const deadline = performance.now() + 900
+    const tick = (): void => {
+      const rect = panel.getBoundingClientRect()
+      const vh = window.innerHeight
+      const settled = rect.height <= 61
+      // While the card sits in the band and has finished shrinking, stop;
+      // a still-shrinking panel in the band stays watched so a mid-flight
+      // anchor shove is corrected on its next frame.
+      if (settled && rect.top >= 40 && rect.bottom <= vh - 40) {
+        followFrame.current = undefined
+        return
+      }
+      scrollerEl.scrollTop += rect.top - vh * 0.3
+      followFrame.current = performance.now() < deadline ? requestAnimationFrame(tick) : undefined
+    }
+    followFrame.current = requestAnimationFrame(tick)
+  }
   return (
     <div className={css.userRow} data-pending-steering={pending || undefined} data-time-hover-root>
       <div className={css.userStack}>
         {renderMessageImages({ images, align: 'end' })}
-        {showBubble && <div className={css.bubble}>
-          {projectUserText(text, referenceLabels)}
-          {rest.map((block, i) => <JsonBlock key={i} label={t('message.extraBlock')} payload={block} truncatedLabel={truncated} />)}
-        </div>}
+        {showBubble && (longText
+          ? (
+            /* One-panel morph: a single clipping container grows from the card
+               height to the bubble height while the two stacked layers
+               cross-fade through blur — the card blurs away, the markdown
+               emerges from blur at the same top-right anchor. Every property
+               is a CSS transition, so toggling mid-flight reverses from the
+               current progress instead of replaying from scratch. */
+            <div
+              ref={morphRef}
+              className={clsx(css.morph, dims === null && css.morphStatic)}
+              style={dims === null ? undefined : { height: expanded ? dims.bubble : dims.card }}
+            >
+              <div ref={cardRef} className={clsx(css.morphLayer, !expanded && css.morphVisible)}>
+                <LongTextCard text={text} actionLabel={t('longText.expand')} onAction={() => setExpanded(true)} />
+              </div>
+              <div ref={bubbleRef} className={clsx(css.morphLayer, expanded && css.morphVisible)}>
+                <div className={css.bubble}>
+                  <MarkdownText text={text} />
+                  <div>
+                    <button type="button" className={css.longTextCollapse} onClick={collapseToCard}>
+                      {t('longText.collapse')}
+                    </button>
+                  </div>
+                </div>
+              </div>
+            </div>
+          )
+          : (
+            <div className={css.bubble}>
+              {projectUserText(text, referenceLabels)}
+              {rest.map((block, i) => <JsonBlock key={i} label={t('message.extraBlock')} payload={block} truncatedLabel={truncated} />)}
+            </div>
+          ))}
         {referenceLabels.length > 0 && (
           <div className={css.referenceSummary}>
             {t('message.referenceSummary', { labels: referenceLabels.join(t('message.referenceSeparator')) })}

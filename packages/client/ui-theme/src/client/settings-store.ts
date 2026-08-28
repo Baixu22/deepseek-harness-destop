@@ -35,3 +35,33 @@ export function createAppearanceRowStore(): EngineStoreHandle<AppearanceRowState
     },
   })
 }
+
+/** Store state mirrored from the theme snapshot's RESOLVED scheme. */
+export interface ThemeTogglerState {
+  /** Resolved color scheme the toggle reflects (never the raw preference). */
+  scheme: 'light' | 'dark'
+  /** Service revision; -1 until first sync so revision 0 lands as a change. */
+  revision: number
+}
+
+/** Declared action shape giving the exported factory a stable return type. */
+type ThemeTogglerActions = {
+  sync: (draft: ThemeTogglerState, scheme: 'light' | 'dark', revision: number) => void
+}
+
+/**
+ * Declares the theme toggler state and write surface.
+ * @returns the store handle.
+ */
+export function createThemeTogglerStore(): EngineStoreHandle<ThemeTogglerState, ThemeTogglerActions> {
+  return defineStore({
+    init: (): ThemeTogglerState => ({ scheme: 'light', revision: -1 }),
+    actions: {
+      sync: (d, scheme: 'light' | 'dark', revision: number) => {
+        if (revision <= d.revision) return
+        d.scheme = scheme
+        d.revision = revision
+      },
+    },
+  })
+}

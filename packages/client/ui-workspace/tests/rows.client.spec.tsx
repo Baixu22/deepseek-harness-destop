@@ -5,7 +5,7 @@ import type { SessionId, WorkspaceId } from '@deepseek-ai/dsh-client-runtime/cli
 import { makeTranslate } from '@deepseek-ai/dsh-client-test-runtime'
 import { zh as commonZh } from '@deepseek-ai/dsh-client-locale/src/locales/zh.ts'
 import type { RowDragProps } from '../src/client/rows/Rows.tsx'
-import { ProjectRowItem, SearchResultItem, SessionNodeItem } from '../src/client/rows/Rows.tsx'
+import { ProjectRowItem, SearchResultItem, SessionHoverContent, SessionListHoverCard, SessionNodeItem, titleMarquee, useSessionListHover } from '../src/client/rows/Rows.tsx'
 import type { GroupNode, SearchResultNode, SessionNode } from '../src/client/tree.ts'
 import { zh } from '../src/client/locales.ts'
 
@@ -48,6 +48,26 @@ function installClipboard(writeText: (text: string) => Promise<void>): () => voi
 
 const dataTransfer = { effectAllowed: '', dropEffect: '', setData: vi.fn() }
 
+/**
+ * Shared-card harness: the row reports pointer moves to a list-level hover
+ * share and the one session card renders beside it, mirroring the assembled
+ * list (Rows no longer renders a card per row).
+ */
+function HoverSession({ node, now }: { node: SessionNode; now: number }) {
+  const hover = useSessionListHover(false)
+  return (
+    <>
+      <SessionNodeItem node={node} currentId={undefined} now={now} onOpen={vi.fn()}
+        onRename={vi.fn()} onFork={vi.fn()} onArchive={vi.fn()} hover={hover} t={t} />
+      {hover.target !== null && (
+        <SessionListHoverCard target={hover.target} onCardEnter={hover.cardEnter} onCardLeave={hover.cardLeave}>
+          <SessionHoverContent node={node} now={now} workspace={undefined} t={t} />
+        </SessionListHoverCard>
+      )}
+    </>
+  )
+}
+
 /** jsdom lacks DragEvent — the fireEvent fallback drops clientY, so pin it on the built event. */
 function fireDrag(row: HTMLElement, kind: 'dragOver' | 'drop', clientY: number): void {
   const event = kind === 'dragOver' ? createEvent.dragOver(row) : createEvent.drop(row)
@@ -64,12 +84,13 @@ describe('workspace browser rows', () => {
     }
     const view = render(<SessionNodeItem node={idle} currentId={undefined} now={0} onOpen={vi.fn()}
       onRename={vi.fn()} onFork={vi.fn()} onArchive={vi.fn()} flat t={t} />)
-    const title = screen.getByText('Flat Session')
-    expect(title.previousElementSibling).toBeNull()
+    // The title text lives in the inner marquee span; the cell is its parent.
+    const title = () => screen.getByText('Flat Session').parentElement!
+    expect(title().previousElementSibling).toBeNull()
 
     view.rerender(<SessionNodeItem node={{ ...idle, running: true }} currentId={undefined} now={0}
       onOpen={vi.fn()} onRename={vi.fn()} onFork={vi.fn()} onArchive={vi.fn()} flat t={t} />)
-    expect(screen.getByText('Flat Session').previousElementSibling?.querySelector('[data-state="ongoing"]')).toBeTruthy()
+    expect(title().previousElementSibling?.querySelector('[data-state="ongoing"]')).toBeTruthy()
   })
 
   it('renders a selected content-search row and opens only its session', () => {
@@ -195,7 +216,7 @@ describe('workspace browser rows', () => {
 
       fireEvent.pointerEnter(row.parentElement as HTMLElement)
       act(() => { vi.advanceTimersByTime(500) })
-      expect(screen.getAllByText('2 个子代理运行中')).toHaveLength(2)
+      expect(screen.getByText('2 个子代理运行中')).toBeTruthy()
     } finally {
       vi.useRealTimers()
     }
@@ -217,8 +238,8 @@ describe('workspace browser rows', () => {
 
       fireEvent.pointerEnter(row.parentElement as HTMLElement)
       act(() => { vi.advanceTimersByTime(500) })
-      expect(screen.getAllByText('进行中')).toHaveLength(2)
-      expect(screen.getAllByText('1 个子代理运行中')).toHaveLength(2)
+      expect(screen.getByText('进行中')).toBeTruthy()
+      expect(screen.getByText('1 个子代理运行中')).toBeTruthy()
     } finally {
       vi.useRealTimers()
     }
@@ -376,19 +397,15 @@ describe('workspace browser rows', () => {
         id: sid('s-blank'), title: 'ignored', blank: true, running: false,
         runningSubagentCount: 0, completed: false, updatedAt: 0,
       }
-      render(<SessionNodeItem node={node} currentId={node.id} now={0} onOpen={vi.fn()}
-        onRename={vi.fn()} onFork={vi.fn()} onArchive={vi.fn()} t={t} />)
+      render(<HoverSession node={node} now={0} />)
       // The placeholder has no content yet: no row verbs, no "now" stamp.
       expect(screen.queryByRole('button', { name: /会话.*的操作/ })).toBeNull()
       expect(screen.queryByText('刚刚')).toBeNull()
-      // The hover card keeps title + status but drops the timestamp line.
-      const wrapper = screen.getByRole('treeitem').parentElement as HTMLElement
-      fireEvent.pointerEnter(wrapper)
+      // The shared card shows the title but no timestamp (blank placeholder).
+      fireEvent.pointerEnter(screen.getByRole('treeitem'))
       act(() => { vi.advanceTimersByTime(500) })
       expect(screen.getAllByText('新会话').length).toBeGreaterThanOrEqual(2)
-      expect(screen.getByText('空闲')).toBeTruthy()
       expect(screen.queryByText('刚刚')).toBeNull()
-      expect(screen.getByText('空闲').closest('[role="button"]')).toBeNull()
     } finally {
       vi.useRealTimers()
     }
@@ -430,26 +447,24 @@ describe('workspace browser rows', () => {
   })
 
 
-  it('shows the hover card after the dwell and suppresses it while the row menu is open', () => {
+  it('shows the shared hover card after the dwell and suppresses it while the row menu is open', () => {
     vi.useFakeTimers()
     try {
       const node: SessionNode = {
         id: sid('s1'), title: 'Hovered', blank: false, running: true,
         runningSubagentCount: 0, completed: false, updatedAt: 0,
       }
-      render(<SessionNodeItem node={node} currentId={undefined} now={60_000} onOpen={vi.fn()}
-        onRename={vi.fn()} onFork={vi.fn()} onArchive={vi.fn()} t={t} />)
-      const wrapper = screen.getByRole('treeitem').parentElement as HTMLElement
-      fireEvent.pointerEnter(wrapper)
+      render(<HoverSession node={node} now={60_000} />)
+      const row = screen.getByRole('treeitem')
+      fireEvent.pointerEnter(row)
       act(() => { vi.advanceTimersByTime(500) })
-      // Card body: full title + relative time + running status.
+      // Card body: full title + relative time badge, once on the row, once on the card.
       expect(screen.getAllByText('Hovered')).toHaveLength(2)
       expect(screen.getByText('1分钟前')).toBeTruthy()
-      expect(screen.getAllByText('进行中')).toHaveLength(2)
-      fireEvent.pointerLeave(wrapper)
-      // Menu open (disabled=true) suppresses the card for the same hover.
+      // Menu open hides the shared card and keeps it down through a re-hover.
       fireEvent.click(screen.getByRole('button', { name: '会话“Hovered”的操作' }))
-      fireEvent.pointerEnter(wrapper)
+      expect(screen.queryByText('1分钟前')).toBeNull()
+      fireEvent.pointerEnter(row)
       act(() => { vi.advanceTimersByTime(1000) })
       expect(screen.queryByText('1分钟前')).toBeNull()
     } finally {
@@ -481,44 +496,40 @@ describe('workspace browser rows', () => {
 
       fireEvent.pointerEnter(screen.getByRole('treeitem').parentElement as HTMLElement)
       act(() => { vi.advanceTimersByTime(500) })
-      expect(screen.getAllByText(label)).toHaveLength(2)
-      expect(document.querySelectorAll('[data-state="warning"]')).toHaveLength(2)
+      expect(screen.getByText(label)).toBeTruthy()
+      expect(document.querySelectorAll('[data-state="warning"]')).toHaveLength(1)
     } finally {
       vi.useRealTimers()
     }
   })
 
-  it('idle hover card shows the Idle status line', () => {
+  it('idle hover card shows the time badge', () => {
     vi.useFakeTimers()
     try {
       const node: SessionNode = {
         id: sid('s1'), title: 'Quiet', blank: false, running: false,
         runningSubagentCount: 0, completed: false, updatedAt: 0,
       }
-      render(<SessionNodeItem node={node} currentId={undefined} now={0} onOpen={vi.fn()}
-        onRename={vi.fn()} onFork={vi.fn()} onArchive={vi.fn()} t={t} />)
-      fireEvent.pointerEnter(screen.getByRole('treeitem').parentElement as HTMLElement)
+      render(<HoverSession node={node} now={0} />)
+      fireEvent.pointerEnter(screen.getByRole('treeitem'))
       act(() => { vi.advanceTimersByTime(500) })
-      expect(screen.getByText('空闲')).toBeTruthy()
-      expect(screen.getAllByText('刚刚')).toHaveLength(2)
+      expect(screen.getAllByText('刚刚').length).toBeGreaterThanOrEqual(2)
     } finally {
       vi.useRealTimers()
     }
   })
 
-  it('completed hover card shows the Completed status line', () => {
+  it('completed hover card shows the title', () => {
     vi.useFakeTimers()
     try {
       const node: SessionNode = {
         id: sid('s1'), title: 'Done', blank: false, running: false,
         runningSubagentCount: 0, completed: true, updatedAt: 0,
       }
-      render(<SessionNodeItem node={node} currentId={undefined} now={0} onOpen={vi.fn()}
-        onRename={vi.fn()} onFork={vi.fn()} onArchive={vi.fn()} t={t} />)
-      fireEvent.pointerEnter(screen.getByRole('treeitem').parentElement as HTMLElement)
+      render(<HoverSession node={node} now={0} />)
+      fireEvent.pointerEnter(screen.getByRole('treeitem'))
       act(() => { vi.advanceTimersByTime(500) })
-      // Row's visually-hidden reminder label plus the hover card's status line.
-      expect(screen.getAllByText('已完成')).toHaveLength(2)
+      expect(screen.getAllByText('Done').length).toBeGreaterThanOrEqual(2)
     } finally {
       vi.useRealTimers()
     }
@@ -606,6 +617,62 @@ describe('workspace browser rows', () => {
     fireEvent.contextMenu(screen.getByRole('treeitem'), { clientX: 10, clientY: 20 })
     fireEvent.click(screen.getByRole('menuitem', { name: '打开所在位置' }))
     expect(onOpenLocation).toHaveBeenCalledWith('C:\\projects\\project')
+  })
+
+  it('titleMarquee plans the exact overflow travel with a duration floor', () => {
+    // A fitting title scrolls nowhere.
+    expect(titleMarquee(100, 100)).toBeUndefined()
+    expect(titleMarquee(90, 100)).toBeUndefined()
+    // Travel is exactly the overflow, so the text never leaves its clipped box.
+    expect(titleMarquee(250, 100)).toEqual({ shift: 150, durationMs: 3750 })
+    // Short overflows still read as deliberate motion (the 1200ms floor).
+    expect(titleMarquee(110, 100)).toEqual({ shift: 10, durationMs: 1200 })
+  })
+
+  it('pins through the row menu and unpins through the pinned-row badge', () => {
+    const onTogglePin = vi.fn()
+    const node: SessionNode = {
+      id: sid('s1'), title: 'One', blank: false, running: false,
+      runningSubagentCount: 0, completed: false, updatedAt: 0,
+    }
+    const { rerender } = render(<SessionNodeItem node={node} currentId={undefined} now={0} onOpen={vi.fn()}
+      onRename={vi.fn()} onFork={vi.fn()} onArchive={vi.fn()} onTogglePin={onTogglePin} t={t} />)
+    fireEvent.click(screen.getByRole('button', { name: '会话“One”的操作' }))
+    fireEvent.click(screen.getByRole('menuitem', { name: '置顶' }))
+    expect(onTogglePin).toHaveBeenCalledWith(node.id)
+
+    rerender(<SessionNodeItem node={node} currentId={undefined} now={0} onOpen={vi.fn()}
+      onRename={vi.fn()} onFork={vi.fn()} onArchive={vi.fn()} pinned onTogglePin={onTogglePin} t={t} />)
+    expect(screen.getByRole('treeitem').className).toMatch(/pinned/)
+    // The pinned card keeps its verbs visible: the badge is present without hover.
+    fireEvent.click(screen.getByRole('button', { name: '取消置顶“One”' }))
+    expect(onTogglePin).toHaveBeenCalledTimes(2)
+    // The open menu now offers the reverse action.
+    fireEvent.click(screen.getByRole('button', { name: '会话“One”的操作' }))
+    fireEvent.click(screen.getByRole('menuitem', { name: '取消置顶' }))
+    expect(onTogglePin).toHaveBeenCalledTimes(3)
+  })
+
+  it('sessions without pin wiring keep the three-verb menu and no badge', () => {
+    const node: SessionNode = {
+      id: sid('s1'), title: 'One', blank: false, running: false,
+      runningSubagentCount: 0, completed: false, updatedAt: 0,
+    }
+    render(<SessionNodeItem node={node} currentId={undefined} now={0} onOpen={vi.fn()}
+      onRename={vi.fn()} onFork={vi.fn()} onArchive={vi.fn()} t={t} />)
+    fireEvent.click(screen.getByRole('button', { name: '会话“One”的操作' }))
+    expect(screen.queryByRole('menuitem', { name: '置顶' })).toBeNull()
+  })
+
+  it('blank rows never surface pin actions even in the pinned section', () => {
+    const node: SessionNode = {
+      id: sid('s-blank'), title: 'ignored', blank: true, running: false,
+      runningSubagentCount: 0, completed: false, updatedAt: 0,
+    }
+    render(<SessionNodeItem node={node} currentId={undefined} now={0} onOpen={vi.fn()}
+      onRename={vi.fn()} onFork={vi.fn()} onArchive={vi.fn()} pinned onTogglePin={vi.fn()} t={t} />)
+    expect(screen.queryByRole('button', { name: /取消置顶/ })).toBeNull()
+    expect(screen.queryByRole('button', { name: /会话.*的操作/ })).toBeNull()
   })
 
   it('session row without a Workspace path shows no context menu', () => {

@@ -1,20 +1,19 @@
 {
   "name": "@baixu22/dsh-desktop",
   "productName": "DSH",
-  "version": "0.1.19",
+  "version": "0.1.25",
   "description": "Unofficial community desktop edition of DeepSeek Harness",
   "author": {
     "name": "Baixu22",
     "url": "https://github.com/Baixu22/deepseek-harness-destop"
   },
-  "homepage": "https://github.com/Baixu22/deepseek-harness-destop#readme",
+  "homepage": "https://github.com/luo-ross/dsh-desktop#readme",
   "repository": {
     "type": "git",
-    "url": "git+https://github.com/Baixu22/deepseek-harness-destop.git",
-    "directory": "apps/desktop"
+    "url": "git+https://github.com/luo-ross/dsh-desktop.git"
   },
   "bugs": {
-    "url": "https://github.com/Baixu22/deepseek-harness-destop/issues"
+    "url": "https://github.com/luo-ross/dsh-desktop/issues"
   },
   "type": "module",
   "main": "main.mjs",
@@ -40,7 +39,7 @@
     "electron-builder": "26.15.3"
   },
   "build": {
-    "appId": "io.github.baixu22.dshdesktop",
+    "appId": "io.github.luo-ross.dshdesktop",
     "productName": "DSH",
     "asar": true,
     "npmRebuild": false,
@@ -52,6 +51,8 @@
       "backend-contract.mjs",
       "updater.mjs",
       "welcome-page.mjs",
+      "splash-page.mjs",
+      "plugin-links.mjs",
       "official-logo.svg",
       "github-preview.jpg",
       "fonts/**/*",
@@ -59,16 +60,11 @@
       "window-controls.mjs",
       "preload.cjs",
       "codex-theme.css",
-      "scripts/extract-backend.mjs",
       "build/icon.ico",
       "build/icon.png",
+      "build/icon-black.png",
+      "build/icon-white.png",
       "package.json"
-    ],
-    "extraResources": [
-      {
-        "from": "../../desktop-backend.tar.gz",
-        "to": "backend.tar.gz"
-      }
     ],
     "win": {
       "icon": "build/icon.ico",
@@ -87,8 +83,20 @@
       "icon": "build/icon.png",
       "category": "public.app-category.productivity",
       "target": [
-        { "target": "dmg", "arch": ["x64", "arm64"] },
-        { "target": "zip", "arch": ["x64", "arm64"] }
+        {
+          "target": "dmg",
+          "arch": [
+            "x64",
+            "arm64"
+          ]
+        },
+        {
+          "target": "zip",
+          "arch": [
+            "x64",
+            "arm64"
+          ]
+        }
       ],
       "artifactName": "DSH-macOS-${arch}-${version}.${ext}"
     },
@@ -96,15 +104,25 @@
       "icon": "build/icon.png",
       "category": "Utility",
       "target": [
-        { "target": "AppImage", "arch": ["x64"] },
-        { "target": "deb", "arch": ["x64"] }
+        {
+          "target": "AppImage",
+          "arch": [
+            "x64"
+          ]
+        },
+        {
+          "target": "deb",
+          "arch": [
+            "x64"
+          ]
+        }
       ],
       "artifactName": "DSH-Linux-x64-${version}.${ext}"
     },
     "publish": {
       "provider": "github",
-      "owner": "Baixu22",
-      "repo": "deepseek-harness-destop"
+      "owner": "luo-ross",
+      "repo": "dsh-desktop"
     },
     "nsis": {
       "installerIcon": "build/icon.ico",
@@ -114,6 +132,7 @@
       "createDesktopShortcut": true,
       "createStartMenuShortcut": true,
       "shortcutName": "DSH"
-    }
+    },
+    "afterPack": "scripts/copy-backend.cjs"
   }
 }

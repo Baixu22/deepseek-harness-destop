@@ -158,6 +158,31 @@ const TEST_CONVERSATION: ConversationRuntime = {
   } as unknown as ConversationRuntime['views'],
 }
 
+/** Keys user/message Contexts by data.id like the host input-message definition
+ *  (every other event still keyed by seq), so id repeats collide exactly as in
+ *  legacy instruction-hint logs. */
+const MESSAGE_ID_DEFINITION: ConversationNodeDefinition<TestEventState> = {
+  ...TEST_EVENT_DEFINITION,
+  kind: 'message-id-keyed',
+  match: event => event.type === 'user/message'
+    ? { id: String(event.data.id), role: 'start' }
+    : { id: String(event.seq), role: 'start' },
+}
+
+const MESSAGE_ID_CONVERSATION: ConversationRuntime = {
+  events: {
+    entries: () => [MESSAGE_ID_DEFINITION],
+    fallbackEntry: () => undefined,
+  } as unknown as ConversationRuntime['events'],
+  views: {
+    entries: () => [testViewDefinition()],
+  } as unknown as ConversationRuntime['views'],
+}
+
+function makeMessageIdSession(api = new FakeApiClient()): { api: FakeApiClient; session: Session } {
+  return { api, session: new Session(SID, api, fakeRemote(), { conversation: MESSAGE_ID_CONVERSATION }) }
+}
+
 function makeSession(api = new FakeApiClient()): { api: FakeApiClient; session: Session } {
   return { api, session: new Session(SID, api, fakeRemote(), { conversation: TEST_CONVERSATION }) }
 }
@@ -442,6 +467,57 @@ describe('paging', () => {
     }))
     await Promise.all([first, second])
     expect(api.callsOf('session.history')).toHaveLength(2) // open + one page, not two
+  })
+
+  describe('repeated injected message ids (legacy instruction-hint logs)', () => {
+    it('prepends an older page carrying an already-projected message id', async () => {
+      const newer = [...plainTurn(10, 1, '新问', '新答'), ev.hint(16, 'hint-1', '注入')]
+      const older = [
+        ev.hint(4, 'hint-1', '注入'),
+        ev.turnStart(5, 0), ev.user(6, '旧问'),
+        ev.stepStart(7, 0), ev.assistant(8, 0, '旧答'), ev.stepEnd(9, 0),
+      ]
+      const { api, session } = makeMessageIdSession()
+      api.onHistory = payload => payload.beforeSeq === undefined
+        ? histResponse(newer, true)
+        : histResponse(older, false)
+      const errorSpy = vi.spyOn(console, 'error').mockImplementation(() => undefined)
+      try {
+        await session.open()
+        expect(chatSeqs(session.getSnapshot())).toEqual([10, 11, 12, 13, 14, 15, 16])
+        await session.loadOlder()
+        const snapshot = session.getSnapshot()
+        expect(errorSpy).not.toHaveBeenCalled()
+        expect(snapshot.hasMore).toBe(false)
+        // the older copy of hint-1 is dropped at projection; its raw slot stays
+        expect(chatSeqs(snapshot)).toEqual([5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15, 16])
+      } finally {
+        errorSpy.mockRestore()
+      }
+    })
+
+    it('opens a tail page holding two copies of one message id', async () => {
+      const page = [
+        ev.turnStart(1, 0), ev.user(2, '问'),
+        ev.hint(3, 'hint-1', '注入A'), ev.hint(4, 'hint-1', '注入B'),
+        ev.stepStart(5, 0), ev.assistant(6, 0, '答'), ev.stepEnd(7, 0), ev.turnEnd(8, 0),
+      ]
+      const { api, session } = makeMessageIdSession()
+      api.onHistory = () => histResponse(page, false)
+      await session.open()
+      const snapshot = session.getSnapshot()
+      expect(snapshot.openState).toBe('open')
+      expect(chatSeqs(snapshot)).toEqual([1, 2, 4, 5, 6, 7, 8])
+    })
+
+    it('ignores a live repeat of an already-projected message id', async () => {
+      const { api, session } = makeMessageIdSession()
+      api.onHistory = () => histResponse([...plainTurn(10, 1, '问', '答'), ev.hint(16, 'hint-1', '注入')], false)
+      await session.open()
+      const before = chatSeqs(session.getSnapshot())
+      session.handleMuxEnvelope('r' as never, { type: 'session/event', sessionId: SID, event: ev.hint(17, 'hint-1', '再注入') })
+      expect(chatSeqs(session.getSnapshot())).toEqual(before)
+    })
   })
 })
 

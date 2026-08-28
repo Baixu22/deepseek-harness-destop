@@ -43,16 +43,27 @@
   color: var(--dsw-alias-label-tertiary);
 }
 
-.cards {
+/* Bento grid (magicui bento-grid pattern, adapted): two columns; each group's
+   lead card takes both columns as the wide feature cell, the rest take one,
+   so the roster reads as one featured composition plus its siblings rather
+   than a uniform shelf. Rows stay equal-height. */
+.bento {
   list-style: none;
   margin: 0;
   padding: 0;
   display: grid;
-  grid-template-columns: repeat(auto-fill, minmax(268px, 1fr));
-  /* Every row the same height, so a short description does not make its card
-     shorter than the one beside it. */
+  grid-template-columns: repeat(2, minmax(0, 1fr));
   grid-auto-rows: 1fr;
   gap: 12px;
+}
+
+.bentoWide {
+  grid-column: 1 / -1;
+}
+
+/* Grid cell wrapping the creator entry so it fills its bento slot. */
+.bentoTail {
+  display: flex;
 }
 
 .card {
@@ -61,12 +72,14 @@
   display: flex;
   flex-direction: column;
   background: var(--dsw-alias-bg-layer-3);
-  transition: border-color .16s, background .16s;
+  transition: border-color .16s, background .16s, transform .16s, box-shadow .16s;
 }
 
 
 .card:hover:not(.cardActive) {
   border-color: var(--dsw-alias-label-dimmed);
+  transform: translateY(-2px);
+  box-shadow: 0 6px 20px color-mix(in srgb, var(--dsw-alias-label-primary) 9%, transparent);
 }
 
 /* The default preset reads as selected, not merely badged. */
@@ -83,6 +96,23 @@
 
 .cardBroken:hover {
   border-color: var(--dsw-alias-state-error-primary);
+}
+
+/* MagicUI bento-grid dark face: a hairline translucent border plus a wide
+   inset top glow reads as a gaussian-soft edge instead of a hard line. */
+:global(body[data-ds-dark-theme]) .card {
+  box-shadow: 0 -20px 80px -20px rgb(255 255 255 / .12) inset;
+}
+
+:global(body[data-ds-dark-theme]) .card:not(.cardActive):not(.cardBroken) {
+  border-color: rgb(255 255 255 / .1);
+}
+
+:global(body[data-ds-dark-theme]) .card:hover:not(.cardActive) {
+  border-color: rgb(255 255 255 / .24);
+  box-shadow:
+    0 -20px 80px -20px rgb(255 255 255 / .18) inset,
+    0 6px 20px rgb(0 0 0 / .5);
 }
 
 .brokenBadge {
@@ -116,9 +146,31 @@
   cursor: pointer;
   display: flex;
   flex-direction: column;
-  gap: 8px;
+  gap: 10px;
   padding: 14px 16px 12px;
   border-radius: 12px 12px 0 0;
+}
+
+/* Wide bento cell: the figure becomes the showcase on the left and the text
+   column sits beside it, so the feature card reads hero-first. */
+.cardMainWide {
+  flex-direction: row;
+  align-items: center;
+  gap: 18px;
+}
+
+.cardText {
+  flex: 1;
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  transition: transform .3s ease;
+}
+
+.card:hover .cardText,
+.card:focus-within .cardText {
+  transform: translateY(-3px);
 }
 
 .cardMain:disabled {
@@ -128,6 +180,66 @@
 .cardMain:focus-visible {
   outline: 2px solid var(--dsw-alias-brand-primary);
   outline-offset: -2px;
+}
+
+/* SVG core display: the preset glyph on a brand-tinted dot-grid tile. */
+.figure {
+  position: relative;
+  flex: none;
+  transition: transform .3s ease;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 44px;
+  height: 44px;
+  border-radius: 12px;
+  border: 1px solid color-mix(in srgb, var(--dsw-alias-brand-primary) 28%, var(--dsw-alias-border-l2));
+  color: var(--dsw-alias-brand-primary);
+  background:
+    radial-gradient(color-mix(in srgb, var(--dsw-alias-brand-primary) 22%, transparent) 1px, transparent 1px) 0 0 / 8px 8px,
+    color-mix(in srgb, var(--dsw-alias-brand-primary) 7%, var(--dsw-alias-bg-layer-2));
+}
+
+/* Wide-cell showcase: larger tile, orbit ring drawn by an inline SVG. */
+.figureWide {
+  width: 104px;
+  height: 104px;
+  border-radius: 18px;
+  background:
+    radial-gradient(color-mix(in srgb, var(--dsw-alias-brand-primary) 22%, transparent) 1px, transparent 1px) 0 0 / 10px 10px,
+    radial-gradient(120% 120% at 30% 20%, color-mix(in srgb, var(--dsw-alias-brand-primary) 14%, transparent), transparent 60%),
+    color-mix(in srgb, var(--dsw-alias-brand-primary) 7%, var(--dsw-alias-bg-layer-2));
+}
+
+.figureOrbit {
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+  pointer-events: none;
+  transform-origin: 50% 50%;
+  transition: transform .3s ease;
+}
+
+/* MagicUI bento-grid hover face: the transparent orbit SVG wakes up when the
+   card is hovered or focused - the ring tilts while the tile lifts. */
+.card:hover .figure,
+.card:focus-within .figure {
+  transform: scale(1.05);
+}
+
+.card:hover .figureOrbit,
+.card:focus-within .figureOrbit {
+  transform: rotate(12deg) scale(1.08);
+}
+
+/* A broken preset's figure carries the error tint instead of the brand one. */
+.figureBroken {
+  color: var(--dsw-alias-state-error-primary);
+  border-color: color-mix(in srgb, var(--dsw-alias-state-error-primary) 35%, var(--dsw-alias-border-l2));
+  background:
+    radial-gradient(color-mix(in srgb, var(--dsw-alias-state-error-primary) 20%, transparent) 1px, transparent 1px) 0 0 / 8px 8px,
+    color-mix(in srgb, var(--dsw-alias-state-error-primary) 7%, var(--dsw-alias-bg-layer-2));
 }
 
 .cardHead {
@@ -175,12 +287,63 @@
   line-height: 1.55;
   color: var(--dsw-alias-label-secondary);
   min-height: 42px;
-  display: -webkit-box;
-  -webkit-box-orient: vertical;
-  -webkit-line-clamp: 4;
+  display: flex;
+  align-items: center;
+  white-space: nowrap;
   overflow: hidden;
-  /* A user-authored description may carry an unbreakable path or URL. */
-  overflow-wrap: anywhere;
+}
+
+/* Ticker face for a description longer than one line: the text auto-scrolls
+   and pauses while the card is hovered or focused. The hidden nowrap
+   measurer keeps the overflow verdict stable while the visible face swaps. */
+.cardDescScroll {
+  display: block;
+  position: relative;
+}
+
+.cardDescMeasure {
+  display: block;
+  visibility: hidden;
+  white-space: nowrap;
+  overflow: hidden;
+}
+
+.marquee {
+  position: absolute;
+  inset: 0;
+  display: flex;
+  align-items: center;
+  gap: 32px;
+  overflow: hidden;
+  mask-image: linear-gradient(to right, transparent, #000 14px, #000 calc(100% - 14px), transparent);
+}
+
+.marqueeCopy {
+  flex: none;
+  white-space: nowrap;
+  animation: preset-card-marquee var(--marquee-duration, 20s) linear infinite;
+  will-change: transform;
+}
+
+@keyframes preset-card-marquee {
+  from {
+    transform: translateX(0);
+  }
+
+  to {
+    transform: translateX(calc(-100% - 32px));
+  }
+}
+
+.card:hover .marqueeCopy,
+.card:focus-within .marqueeCopy {
+  animation-play-state: paused;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .marqueeCopy {
+    animation: none;
+  }
 }
 
 .cardId {
@@ -196,6 +359,24 @@
   gap: 2px;
   padding: 6px 10px;
   border-top: 1px solid var(--dsw-alias-border-l2);
+  /* MagicUI bento-grid CTA reveal: the action row slides in on hover/focus. */
+  opacity: 0;
+  transform: translateY(8px);
+  transition: opacity .25s ease, transform .25s ease;
+}
+
+.card:hover .cardFoot,
+.card:focus-within .cardFoot {
+  opacity: 1;
+  transform: translateY(0);
+}
+
+/* Touch has no hover: keep the actions reachable. */
+@media (hover: none) {
+  .cardFoot {
+    opacity: 1;
+    transform: none;
+  }
 }
 
 /* Icon-only actions: the label rides `title` so the row stays quiet until
@@ -385,12 +566,13 @@
    reads as a place a preset will appear, not a command. */
 .creatorButton {
   box-sizing: border-box;
+  flex: 1;
   align-self: stretch;
   display: flex;
   align-items: center;
   justify-content: center;
   gap: 6px;
-  height: 44px;
+  min-height: 92px;
   border: 1px dashed var(--dsw-alias-border-l3);
   border-radius: 12px;
   font: inherit;

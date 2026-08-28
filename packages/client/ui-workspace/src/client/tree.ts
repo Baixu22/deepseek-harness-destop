@@ -82,6 +82,8 @@ export interface TreeView {
   expandedGroups: readonly string[]
   /** Browser-local order for Sessions without a backing Workspace account. */
   ungroupedOrder?: readonly string[]
+  /** Pinned session ids in pin order; members leave their groups for the pinned section. */
+  pinnedIds?: readonly string[]
 }
 
 interface Group {
@@ -178,6 +180,7 @@ function groupByWorkspace(
   workspaces: readonly WorkspaceView[],
   archived: ReadonlySet<SessionId>,
   ungroupedOrder: readonly string[] | undefined,
+  pinned: ReadonlySet<string>,
 ): Group[] {
   const groups: Group[] = []
   const accounted = new Set<SessionId>()
@@ -187,6 +190,7 @@ function groupByWorkspace(
       const summary = list.byId[id]
       if (summary === undefined) continue // account may lead the list pull; the row appears when the summary lands
       accounted.add(id)
+      if (pinned.has(id)) continue // pinned rows render in the pinned section, not their group
       if (!sessionVisible(summary, list.current, archived)) continue
       members.push(summary)
     }
@@ -198,7 +202,8 @@ function groupByWorkspace(
   const stray = list.ids
     .map(id => list.byId[id])
     .filter((s): s is SessionSummary =>
-      s !== undefined && !accounted.has(s.id) && sessionVisible(s, list.current, archived))
+      s !== undefined && !accounted.has(s.id) && !pinned.has(s.id)
+      && sessionVisible(s, list.current, archived))
   if (stray.length > 0) {
     groups.push(buildGroup(
       UNGROUPED_KEY,
@@ -252,13 +257,14 @@ export function deriveGroups(
 ): GroupNode[] {
   const archived = new Set(archivedSessionIds)
   const expandedGroups = new Set(view.expandedGroups)
+  const pinned = new Set(view.pinnedIds ?? [])
   const descendants = indexSubagentDescendants(list.byId)
   const currentGroup = list.current === undefined
     ? undefined
     : (workspaces.find(w => w.sessionIds.includes(list.current as SessionId))?.workspaceId as string | undefined)
         ?? UNGROUPED_KEY
   const groups: GroupNode[] = []
-  for (const g of groupByWorkspace(list, workspaces, archived, view.ungroupedOrder)) {
+  for (const g of groupByWorkspace(list, workspaces, archived, view.ungroupedOrder, pinned)) {
     const expanded = expandedGroups.has(g.key)
     groups.push({
       key: g.key,
@@ -300,6 +306,31 @@ export function deriveFlat(
   return rows.map(session => sessionNode(session, descendants))
 }
 
+/**
+ * Derive the pinned section rows: every visible pinned session in pin order,
+ * regardless of which Workspace owns it. Stale ids (archived, subagent,
+ * deleted) resolve to nothing, so the persisted pin list needs no pruning.
+ * @param list - sessions list snapshot.
+ * @param archivedSessionIds - registry-global archive set.
+ * @param pinnedSessionIds - persisted pin order.
+ * @returns pinned rows in pin order.
+ */
+export function derivePinned(
+  list: SessionListState,
+  archivedSessionIds: readonly SessionId[],
+  pinnedSessionIds: readonly string[],
+): SessionNode[] {
+  const archived = new Set(archivedSessionIds)
+  const descendants = indexSubagentDescendants(list.byId)
+  const rows: SessionNode[] = []
+  for (const id of pinnedSessionIds) {
+    const s = list.byId[id as SessionId]
+    if (s === undefined || !sessionVisible(s, list.current, archived)) continue
+    rows.push(sessionNode(s, descendants))
+  }
+  return rows
+}
+
 /** Relative-time bucket of a session row's trailing label. */
 export type RelativeTimeUnit = 'now' | 'minutes' | 'hours' | 'days' | 'months' | 'years'
 
@@ -307,6 +338,39 @@ export type RelativeTimeUnit = 'now' | 'minutes' | 'hours' | 'days' | 'months' |
 export interface RelativeTime {
   unit: RelativeTimeUnit
   n: number
+}
+
+/** One flat search row mapped from a Session summary plus its Workspace label. */
+function toResultNode(
+  summary: SessionSummary,
+  labelOf: (summary: SessionSummary) => string,
+  descendants: ReturnType<typeof indexSubagentDescendants>,
+  snippet: string | undefined,
+): SearchResultNode {
+  return {
+    id: summary.id,
+    title: sessionTitle(summary),
+    workspace: labelOf(summary),
+    running: summary.running,
+    runningSubagentCount: descendants.get(summary.id)?.runningCount ?? 0,
+    ...(summary.pendingInteraction === undefined
+      ? {}
+      : { pendingInteraction: summary.pendingInteraction }),
+    completed: summary.completed === true,
+    ...(snippet === undefined ? {} : { snippet }),
+  }
+}
+
+/** Workspace display label per session id, falling back to the cwd basename. */
+function indexWorkspaceLabels(workspaces: readonly WorkspaceView[]): (summary: SessionSummary) => string {
+  const workspaceBySession = new Map<SessionId, string>()
+  for (const workspace of workspaces) {
+    for (const sessionId of workspace.sessionIds) {
+      if (!workspaceBySession.has(sessionId)) workspaceBySession.set(sessionId, workspace.title)
+    }
+  }
+  return (summary: SessionSummary): string =>
+    workspaceBySession.get(summary.id) ?? workspaceLabel(summary.cwd)
 }
 
 /**
@@ -333,15 +397,7 @@ export function deriveSearchResults(
   if (q === '') return { items: [], hasMore: false }
   const archived = new Set(archivedSessionIds)
   const descendants = indexSubagentDescendants(list.byId)
-
-  const workspaceBySession = new Map<SessionId, string>()
-  for (const workspace of workspaces) {
-    for (const sessionId of workspace.sessionIds) {
-      if (!workspaceBySession.has(sessionId)) workspaceBySession.set(sessionId, workspace.title)
-    }
-  }
-  const labelOf = (summary: SessionSummary): string =>
-    workspaceBySession.get(summary.id) ?? workspaceLabel(summary.cwd)
+  const labelOf = indexWorkspaceLabels(workspaces)
   const contentBySession = new Map<SessionId, SessionSearchResultItem>()
   for (const item of content.items) {
     if (!contentBySession.has(item.sessionId)) contentBySession.set(item.sessionId, item)
@@ -376,23 +432,34 @@ export function deriveSearchResults(
   }
 
   return {
-    items: ordered.slice(0, limit).map((summary) => {
-      const match = contentBySession.get(summary.id)
-      return {
-        id: summary.id,
-        title: sessionTitle(summary),
-        workspace: labelOf(summary),
-        running: summary.running,
-        runningSubagentCount: descendants.get(summary.id)?.runningCount ?? 0,
-        ...(summary.pendingInteraction === undefined
-          ? {}
-          : { pendingInteraction: summary.pendingInteraction }),
-        completed: summary.completed === true,
-        ...match === undefined ? {} : { snippet: match.snippet },
-      }
-    }),
+    items: ordered.slice(0, limit)
+      .map(summary => toResultNode(summary, labelOf, descendants, contentBySession.get(summary.id)?.snippet)),
     hasMore: content.hasMore || ordered.length > limit,
   }
+}
+
+/**
+ * The search palette's resting body (empty query): visible non-blank sessions
+ * newest-first, Workspace-labeled exactly like search rows but without
+ * content snippets.
+ */
+export function deriveRecentSessions(
+  list: SessionListState,
+  workspaces: readonly WorkspaceView[],
+  archivedSessionIds: readonly SessionId[],
+  limit: number,
+): SearchResultNode[] {
+  const archived = new Set(archivedSessionIds)
+  const descendants = indexSubagentDescendants(list.byId)
+  const labelOf = indexWorkspaceLabels(workspaces)
+  const visible: SessionSummary[] = []
+  for (const id of list.ids) {
+    const summary = list.byId[id]
+    if (summary === undefined || summary.blank || !sessionVisible(summary, list.current, archived)) continue
+    visible.push(summary)
+  }
+  visible.sort(byRecency)
+  return visible.slice(0, limit).map(summary => toResultNode(summary, labelOf, descendants, undefined))
 }
 
 /**

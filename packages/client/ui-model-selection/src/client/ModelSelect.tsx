@@ -16,10 +16,11 @@ import {
   type KeyboardEvent, type FocusEvent,
 } from 'react'
 import clsx from 'clsx'
+import { motion, useReducedMotion } from 'motion/react'
 import type { ModelReasoningEffort, ModelSelection } from '@deepseek-ai/dsh-api-remotes/client'
 import {
   IconCheckOutline16, IconChevronDownOutline14, IconChevronRightOutline14,
-  IconWarningOutline16, Toast, Tooltip,
+  IconWarningOutline16, Toast,
 } from '@deepseek-ai/dsh-client-ui-primitives'
 import type { PropsLocale } from '@deepseek-ai/dsh-client-ui-slots'
 import type { ModelSelectInjected } from './slots.ts'
@@ -63,6 +64,11 @@ export function ModelSelect(
   const triggerRef = useRef<HTMLButtonElement | null>(null)
   const itemRefs = useRef<(HTMLButtonElement | null)[]>([])
   const id = useId()
+  // Same opening spring as the Menu primitive (the sibling permission
+  // switcher's component): the card scales out of the anchor corner it is
+  // pinned to — here the top-right, since the menu opens upward — and
+  // reduced motion keeps a plain fade.
+  const reduceMotion = useReducedMotion()
 
   const choices = useMemo(() => state.groups.flatMap(group =>
     group.models.map(model => ({
@@ -203,7 +209,6 @@ export function ModelSelect(
   }
 
   const modelLabel = currentChoice?.model.name ?? t('trigger.fallback')
-  const triggerLabel = effortLabel === undefined ? modelLabel : `${modelLabel} · ${effortLabel}`
   const triggerAria = currentChoice === undefined
     ? t('trigger.selectAria')
     : effortLabel === undefined
@@ -218,37 +223,39 @@ export function ModelSelect(
 
   return (
     <div ref={rootRef} className={css.root} onKeyDown={onRootKeyDown} onBlur={onBlur}>
-      <Tooltip label={() => `${triggerLabel}\n${t('trigger.tip')}`} side="top">
-        <button
-          ref={triggerRef}
-          type="button"
-          className={css.trigger}
-          aria-label={triggerAria}
-          aria-haspopup="menu"
-          aria-expanded={open}
-          aria-controls={open ? `${id}-menu` : undefined}
-          disabled={locked}
-          onClick={() => {
-            if (open) {
-              close()
-            } else {
-              show()
-            }
-          }}
-        >
-          <span className={css.triggerLabel}>{modelLabel}</span>
-          {effortLabel !== undefined && <span className={css.triggerEffort}>{effortLabel}</span>}
-          <IconChevronDownOutline14 className={clsx(css.chevron, open && css.chevronOpen)} />
-        </button>
-      </Tooltip>
+      <button
+        ref={triggerRef}
+        type="button"
+        className={css.trigger}
+        aria-label={triggerAria}
+        aria-haspopup="menu"
+        aria-expanded={open}
+        aria-controls={open ? `${id}-menu` : undefined}
+        disabled={locked}
+        onClick={() => {
+          if (open) {
+            close()
+          } else {
+            show()
+          }
+        }}
+      >
+        <span className={css.triggerLabel}>{modelLabel}</span>
+        {effortLabel !== undefined && <span className={css.triggerEffort}>{effortLabel}</span>}
+        <IconChevronDownOutline14 className={clsx(css.chevron, open && css.chevronOpen)} />
+      </button>
 
       {open && (
-        <div
+        <motion.div
           id={`${id}-menu`}
           className={css.menu}
           role="menu"
           aria-label={t('menu.aria')}
           aria-busy={state.status === 'loading' || busy}
+          style={{ transformOrigin: 'bottom right' }}
+          initial={reduceMotion ? { opacity: 0 } : { opacity: 0, scale: 0.5 }}
+          animate={reduceMotion ? { opacity: 1 } : { opacity: 1, scale: 1 }}
+          transition={reduceMotion ? { duration: 0.15 } : { type: 'spring', stiffness: 300, damping: 25 }}
         >
           {pane === 'root' && (
             <>
@@ -360,7 +367,7 @@ export function ModelSelect(
                 ))}
             </>
           )}
-        </div>
+        </motion.div>
       )}
       {toast !== null && (
         <Toast

@@ -738,7 +738,7 @@ describe('TrajectoryTable', () => {
     expect(recovered.style.getPropertyValue('--request-boundary-offset')).toBe('16px')
   })
 
-  it('shows the custom role tooltip only from the responsive icon', () => {
+  it('shows the custom role tooltip only from the responsive icon', async () => {
     const view = render(<TrajectoryTable turns={TURNS} {...FOLD_PROPS} />)
     const toolTag = view.container.querySelector<HTMLElement>('[data-role-kind="tool"]')
     const toolIcon = toolTag?.querySelector<HTMLElement>('[data-role-icon="wrench"]')
@@ -754,7 +754,8 @@ describe('TrajectoryTable', () => {
     expect(tooltip.textContent).toBe('TOOL')
     expect(tooltip.getAttribute('data-side')).toBe('right')
     fireEvent.mouseLeave(toolIcon as HTMLElement)
-    expect(screen.queryByRole('tooltip')).toBeNull()
+    // The bubble exits through AnimatePresence; await the settled unmount.
+    await waitFor(() => { expect(screen.queryByRole('tooltip')).toBeNull() })
   })
 
   it('uses information and compression glyphs for injected and compacted context', () => {

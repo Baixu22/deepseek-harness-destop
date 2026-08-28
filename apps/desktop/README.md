@@ -6,7 +6,7 @@ English | [中文](README.zh.md)
 
 ## Install and start
 
-Download `DSH-Windows-x64-Setup-<version>.exe` from the repository's [Releases page](https://github.com/Baixu22/deepseek-harness-destop/releases). The installer and its differential-update blockmap include `Windows-x64` in their filenames so the supported platform and architecture are unambiguous. The NSIS installer supports a custom installation directory and creates desktop and Start menu shortcuts named **DSH**.
+Download `DSH-Windows-x64-Setup-<version>.exe` from the repository's [Releases page](https://github.com/luo-ross/dsh-desktop/releases). The installer and its differential-update blockmap include `Windows-x64` in their filenames so the supported platform and architecture are unambiguous. The NSIS installer supports a custom installation directory and creates desktop and Start menu shortcuts named **DSH**.
 
 The build is not code-signed. Verify the release SHA-256 before accepting an unknown-publisher warning from Windows SmartScreen. The first launch can take about one minute because the packaged backend must be expanded. Extraction runs in a child process, and a DeepSeek-inspired responsive welcome screen reports extraction, backend startup, and connection phases before opening the main window automatically.
 
@@ -30,7 +30,7 @@ The backend listens only on `127.0.0.1` and chooses a free port. The renderer ha
 
 ## Development
 
-Install the repository prerequisites, run `pnpm install`, then execute `pnpm run desktop:dev` from the repository root. The command builds Harness before launching Electron. Development mode uses the checkout's built CLI rather than the packaged backend archive.
+Install the repository prerequisites, run `pnpm install`, then execute `pnpm run desktop:dev` from the repository root. The command builds Harness before launching Electron. Development mode uses the checkout's built CLI rather than the installed backend runtime.
 
 ## Build the Windows installer
 
@@ -39,16 +39,16 @@ Run `pnpm run desktop:pack` from the repository root. The build performs these o
 1. Build the Harness host and Web UI.
 2. Deploy the production `@deepseek-ai/dsh` dependency closure and the repository's canonical runtime peer roots with a hoisted node linker, then reject a deployment missing any required runtime file.
 3. Overlay the just-built Web frontend and desktop-modified client plugin bundles into the deployed backend so renderer changes ship with the pinned runtime dependency closure.
-4. Create `desktop-backend.tar.gz` so nested dependencies and native files survive Electron Builder packaging.
+4. Leave the deployment directory unpacked: Electron Builder ships it as an extraResources folder and the NSIS installer unpacks it during installation, so application startup never pays extraction latency.
 5. Build the x64 unpacked application, NSIS installer, `latest.yml`, and differential-download blockmap in `dist-desktop/`.
 
-The generated deployment directory, archive, unpacked application, installer, update metadata, and blockmap are ignored by Git. Every GitHub release must publish the installer, `latest.yml`, and matching blockmap together; clients verify the metadata checksum before installing. Release binaries are not committed to the source tree.
+The generated deployment directory, unpacked application, installer, update metadata, and blockmap are ignored by Git. Every GitHub release must publish the installer, `latest.yml`, and matching blockmap together; clients verify the metadata checksum before installing. Release binaries are not committed to the source tree.
 
 ## Troubleshooting
 
-**The first launch appears slow.** Wait for the preparation page to finish. Antivirus scanning and backend extraction can make the first launch materially slower than later launches.
+**The first launch appears slow.** Wait for the preparation page to finish. Antivirus scanning is the usual cause; the backend itself is unpacked by the installer, not at startup.
 
-**Startup reports a missing module or incomplete backend.** Install the newest release. A correctly packaged build carries `backend.tar.gz` and replaces an incomplete versioned extraction automatically.
+**Startup reports a missing module or incomplete backend.** Install the newest release; the backend runtime ships inside the installer and is unpacked at installation time.
 
 **The application reports an HTTP timeout or connection reset.** Close DSH, confirm no older DSH process remains, then start it again. Preserve the complete error message when reporting a reproducible failure.
 

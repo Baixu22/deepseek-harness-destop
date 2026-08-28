@@ -1,0 +1,19 @@
+/* Icon cloud seat under the About rows: a centered, scheme-quiet sphere. */
+
+.cloud {
+  position: relative;
+  display: flex;
+  justify-content: center;
+  padding-top: 8px;
+}
+
+.canvas {
+  width: 280px;
+  height: 280px;
+  border-radius: 12px;
+  cursor: grab;
+}
+
+.canvas:active {
+  cursor: grabbing;
+}

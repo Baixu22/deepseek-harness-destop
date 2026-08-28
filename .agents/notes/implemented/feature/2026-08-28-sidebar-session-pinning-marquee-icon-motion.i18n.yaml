@@ -1,0 +1,6 @@
+# Bilingual-pair consistency record (docs/i18n/README.md): the git blob hash of each
+# side as of the last confirmed-consistent state. Both languages carry equal authority;
+# after editing either side, bring the other along and re-record with:
+#   pnpm run verify-translation-pairing --write .agents/notes/implemented/feature/2026-08-28-sidebar-session-pinning-marquee-icon-motion.md
+2026-08-28-sidebar-session-pinning-marquee-icon-motion.md: 8b0e0afb2f62ca9ca1c9151781f7b6fefb1847a0
+2026-08-28-sidebar-session-pinning-marquee-icon-motion.zh.md: 21da0f0d5110f36d52f81464acfee73f90afa50e

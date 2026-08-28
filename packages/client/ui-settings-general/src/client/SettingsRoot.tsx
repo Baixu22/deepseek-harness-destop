@@ -18,6 +18,7 @@ import {
 } from '@deepseek-ai/dsh-client-ui-primitives'
 import type { SettingsRootComponentProps, SettingsSectionRow } from './shell-contract.ts'
 import css from './SettingsRoot.module.css'
+import { MotionConfig, AnimatePresence, motion } from 'motion/react'
 
 /** Nav glyph by section id; unknown ids fall back to the settings gear. */
 function navIcon(id: string) {
@@ -60,9 +61,29 @@ function SettingsPanel({ rows, renderSlot, activeId, onSelect, onClose }: PanelP
 
   return (
     <div className={css.overlay} role="presentation">
-      <div className={css.mask} aria-hidden="true" onClick={onClose} />
-      <div className={css.panel} role="dialog" aria-modal="true" aria-labelledby={titleId}>
-        <nav className={css.nav}>
+      <motion.div
+        className={css.mask}
+        aria-hidden="true"
+        onClick={onClose}
+        initial={{ opacity: 0 }}
+        animate={{ opacity: 1 }}
+        exit={{ opacity: 0 }}
+        transition={{ duration: 0.25 }}
+      />
+      <motion.div
+        layoutId="dsh-settings-shell"
+        className={css.panel}
+        role="dialog"
+        aria-modal="true"
+        aria-labelledby={titleId}
+        exit={{ opacity: 0, transition: { duration: 0.2 } }}
+      >
+        <motion.nav
+          className={css.nav}
+          initial={{ opacity: 0 }}
+          animate={{ opacity: 1, transition: { delay: 0.15, duration: 0.25 } }}
+          exit={{ opacity: 0, transition: { duration: 0.1 } }}
+        >
           <div className={css.navTitle} id={titleId}>{renderSlot('settings.header', {})}</div>
           <div className={css.navList}>
             {rows.map(row => (
@@ -78,8 +99,13 @@ function SettingsPanel({ rows, renderSlot, activeId, onSelect, onClose }: PanelP
               </button>
             ))}
           </div>
-        </nav>
-        <div className={css.content}>
+        </motion.nav>
+        <motion.div
+          className={css.content}
+          initial={{ opacity: 0 }}
+          animate={{ opacity: 1, transition: { delay: 0.15, duration: 0.25 } }}
+          exit={{ opacity: 0, transition: { duration: 0.1 } }}
+        >
           <div className={css.header}>
             <div className={css.actions}>{renderSlot('settings.action', {})}</div>
             <button ref={closeButton} type="button" className={css.close} onClick={onClose}>
@@ -90,8 +116,8 @@ function SettingsPanel({ rows, renderSlot, activeId, onSelect, onClose }: PanelP
           <div className={css.options}>
             {active !== undefined && renderSlot('settings.section', { close: onClose }, { only: active })}
           </div>
-        </div>
-      </div>
+        </motion.div>
+      </motion.div>
     </div>
   )
 }
@@ -140,33 +166,53 @@ export function SettingsRoot(props: SettingsRootComponentProps) {
   }, [])
 
   return (
-    <>
-      <button
-        type="button"
-        className={clsx(css.trigger, !wide && css.rail)}
-        aria-haspopup="dialog"
-        aria-expanded={open}
-        onClick={() => { setOpen(true) }}
-      >
-        {renderSlot('settings.trigger', { wide })}
-      </button>
-      {open && (
-        <SettingsPanel
-          rows={rows}
-          renderSlot={renderSlot}
-          activeId={activeId}
-          onSelect={setActiveId}
-          onClose={close}
-        />
-      )}
-      {/* Dialog chrome and `#root` inert ownership live inside each step's
-          visible branch. A step still deciding (private facts loading)
-          renders null, so nothing paints or blocks while it decides. */}
-      {onboardingStep !== undefined && renderSlot('settings.onboarding', {
-        stepId: onboardingStep.id,
-        complete: () => { completeOnboardingStep(onboardingStep.id) },
-        openSection,
-      }, { only: onboardingStep.id })}
-    </>
+    <MotionConfig transition={{ type: 'spring', bounce: 0.08, duration: 0.5 }}>
+      <>
+        <div className={clsx(css.triggerRow, !wide && css.rail)}>
+          <motion.button
+            type="button"
+            layoutId="dsh-settings-shell"
+            className={clsx(css.trigger, !wide && css.rail)}
+            aria-haspopup="dialog"
+            aria-expanded={open}
+            onClick={() => { setOpen(true) }}
+          >
+            {/* layout scale-correction: the layoutId morph scales this button
+                between the trigger and panel boxes; the inner layout element
+                counter-scales, so the label stays at its true size and only
+                travels with the box instead of stretching. */}
+            <motion.div layout>
+              {renderSlot('settings.trigger', { wide })}
+            </motion.div>
+          </motion.button>
+          {renderSlot('settings.trigger.trailing', { wide })}
+        </div>
+        {/* AnimatePresence holds the panel through its exit (search palette
+            pattern): the exiting panel keeps the layoutId lead, so it fades
+            while morphing back into the trigger. Without it the panel unmounts
+            instantly and the trigger itself animates from the panel box, its
+            content scaling into a giant distorted label over unmasked UI. */}
+        <AnimatePresence>
+          {open && (
+            <SettingsPanel
+              key="settings-panel"
+              rows={rows}
+              renderSlot={renderSlot}
+              activeId={activeId}
+              onSelect={setActiveId}
+              onClose={close}
+            />
+          )}
+        </AnimatePresence>
+        {/* Dialog chrome and `#root` inert ownership live inside each step's
+            visible branch. A step still deciding (private facts loading)
+            renders null, so nothing paints or blocks while it decides. */}
+        {onboardingStep !== undefined && renderSlot('settings.onboarding', {
+          stepId: onboardingStep.id,
+          complete: () => { completeOnboardingStep(onboardingStep.id) },
+          openSection,
+        }, { only: onboardingStep.id })}
+      </>
+    </MotionConfig>
   )
 }

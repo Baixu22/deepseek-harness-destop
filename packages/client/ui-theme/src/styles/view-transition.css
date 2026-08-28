@@ -1,0 +1,23 @@
+/* Theme-toggle reveal (ui-theme ThemeToggler): while a toggle transition is
+   active, the default root crossfade is replaced by a circular clip reveal
+   driven from the toggler button. The old root paints under the new one;
+   the new root starts clipped to nothing and the JS animation opens it. */
+
+html[data-dsh-theme-vt='active']::view-transition-old(root) {
+  z-index: 1;
+  animation: none;
+  mix-blend-mode: normal;
+}
+
+html[data-dsh-theme-vt='active']::view-transition-new(root) {
+  z-index: 9999;
+  animation: none;
+  mix-blend-mode: normal;
+  /* Collapsed clip pinned until the JS animation takes over. */
+  clip-path: var(--dsh-theme-vt-clip-from);
+}
+
+/* Keep the VT group duration in sync with the JS clip animation. */
+html[data-dsh-theme-vt='active']::view-transition-group(root) {
+  animation-duration: var(--dsh-theme-vt-duration, 400ms);
+}

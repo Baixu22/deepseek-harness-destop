@@ -104,13 +104,25 @@
   height: 20px;
 }
 
-/* Session cell (figma): pad 8, a 16px status slot, then a 4px title gap. */
+/* Session card (figma redesign): a two-tier cell — the head row carries the
+   status slot, bold title, and time/actions; the preview bubble below shows
+   the latest prompt excerpt. Mount fade: session rows appear by unfolding a
+   group (or the tree mounting). Stable row keys keep already-visible rows
+   from replaying it. */
 .sessionRow {
-  height: 32px;
-  gap: 0;
-  /* Mount fade: session rows appear by unfolding a group (or the tree
-     mounting). Stable row keys keep already-visible rows from replaying it. */
+  flex-direction: column;
+  align-items: stretch;
+  gap: 6px;
+  height: auto;
+  padding: 6px 8px;
   animation: row-in 150ms var(--ds-ease-in-out);
+}
+
+.sessionCardHead {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  min-width: 0;
 }
 
 /* Grouped rows sit one tree step below their Workspace header. */
@@ -120,6 +132,7 @@
 
 .sessionRow .title {
   margin: 0 6px 0 4px;
+  font-weight: 500;
 }
 
 .flatSessionRowWithoutStatus .title {
@@ -291,7 +304,9 @@
   bottom: -7px;
 }
 
-/* Hover-card body (figma 169:16903): dark surface, fixed colors both themes. */
+/* Hover-card body (figma 169:16903): label tokens throughout, so both the
+   Workspace HoverCard and the shared session-list card read correctly on
+   either theme's surface. */
 .hoverContent {
   display: flex;
   flex-direction: column;
@@ -301,30 +316,81 @@
 .hoverTitle {
   font-size: 14px;
   line-height: 20px;
-  color: #FFFFFF;
+  color: var(--dsw-alias-label-primary);
   overflow-wrap: break-word;
+  display: -webkit-box;
+  -webkit-line-clamp: 3;
+  -webkit-box-orient: vertical;
+  overflow: hidden;
 }
 
 .hoverPath {
   font-size: 12px;
   line-height: 16px;
-  color: #CFD3D6;
+  color: var(--dsw-alias-label-secondary);
   word-break: break-all;
 }
 
 .hoverTime {
   font-size: 12px;
   line-height: 16px;
-  color: #CFD3D6;
+  color: var(--dsw-alias-label-tertiary);
 }
 
-.hoverStatus {
+.hoverHeader {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 10px;
+}
+
+.hoverTimeBadge {
   display: flex;
   align-items: center;
-  gap: 8px;
-  font-size: 12px;
-  line-height: 20px;
-  color: #ADB2B8;
+  gap: 4px;
+  flex: none;
+  font-size: 11px;
+  line-height: 16px;
+  color: var(--dsw-alias-label-tertiary);
+  white-space: nowrap;
+}
+
+.hoverProject {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  font-size: 11px;
+  line-height: 16px;
+  color: var(--dsw-alias-label-secondary);
+}
+
+.hoverProject svg {
+  flex: none;
+  opacity: 0.8;
+}
+
+/* Shared session-list hover card: one fixed portal that slides between rows
+   through transform variables (compositor-only retarget). Surface, border,
+   and text colors all ride theme tokens, so light and dark themes render
+   the correct elevation without per-theme overrides. pointer-events stays
+   off: a flipped or mid-slide card can sit over the rows themselves, and a
+   click there must always land on the session row underneath. */
+.listHoverCard {
+  position: fixed;
+  left: 0;
+  top: 0;
+  z-index: 100;
+  pointer-events: none;
+  box-sizing: border-box;
+  width: 260px;
+  padding: 12px 16px;
+  border: 1px solid var(--dsw-alias-border-l2);
+  border-radius: 12px;
+  background: var(--dsw-alias-bg-layer-3);
+  box-shadow: var(--dsw-shadow-lv3);
+  transform: translate(var(--list-hover-x), var(--list-hover-y));
+  transition: transform 180ms var(--ds-ease-in-out);
+  animation: row-in 150ms var(--ds-ease-in-out);
 }
 
 .iconButton {
@@ -352,10 +418,103 @@
   color: var(--dsw-alias-label-caption);
 }
 
+/* Hover marquee: Rows.tsx measures the title's exact overflow on pointer
+   entry and sets --marquee-shift/--marquee-duration; the inner span is the
+   only thing that moves, so the text never travels past its own clipped
+   box. The outer cell keeps its ellipsis while static and drops it while
+   the marquee runs. One iteration with a forwards fill: the title scrolls
+   its full overflow once per hover and holds at the end — no bounce-back
+   loop; leaving the row resets it for the next look. */
+.titleText {
+  display: inline-block;
+  white-space: nowrap;
+}
+
+@keyframes title-marquee {
+  from { transform: translateX(0); }
+  to { transform: translateX(var(--marquee-shift, 0px)); }
+}
+
+.sessionRow:hover .titleText,
+.sessionRow.menuOpen .titleText {
+  animation: title-marquee var(--marquee-duration, 2s) linear 300ms 1 forwards;
+}
+
+.sessionRow:hover .title {
+  text-overflow: clip;
+}
+
+/* Pinned card (pin-list layering): one complete elevated cell — a full
+   border on all four sides, never the stacked under-layer slivers, which
+   read as broken half-frames under the row. Pinned rows are never
+   draggable, so the row's ::before/::after drop markers stay unused. */
+.sessionRow.pinned {
+  position: relative;
+  z-index: 1;
+  animation: pin-in 320ms cubic-bezier(0.34, 1.56, 0.64, 1);
+  background: var(--dsw-alias-bg-layer-2);
+  border: 1px solid var(--dsw-alias-border-l1);
+  transition: border-color 150ms var(--ds-ease-in-out);
+}
+
+.sessionRow.pinned:hover {
+  background: var(--dsw-alias-bg-layer-2);
+  border-color: var(--dsw-alias-border-l2);
+}
+
+.sessionRow.pinned.menuOpen {
+  background: var(--dsw-alias-bg-layer-2);
+}
+
+/* The entrance overshoots (back-out curve) and settles, matching the
+   inertial feel of the rows below making way for the card. */
+@keyframes pin-in {
+  from {
+    opacity: 0;
+    transform: translateY(-8px);
+  }
+}
+
+/* Pin + ellipsis take priority over the time label on a pinned card: both
+   stay visible without hover, so the pin affordance never collides with the
+   title's marquee travel. */
+.pinned .rowActions {
+  display: inline-flex;
+}
+
+.pinned .time {
+  display: none;
+}
+
+.pinBadge {
+  flex: none;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 16px;
+  height: 16px;
+  border: none;
+  border-radius: 4px;
+  padding: 0;
+  background: transparent;
+  cursor: pointer;
+  color: var(--dsw-alias-state-business-primary);
+}
+
+.pinBadge:hover {
+  color: var(--dsw-alias-label-primary);
+}
+
 @media (prefers-reduced-motion: reduce) {
   .sessionRow,
-  .arrow {
+  .arrow,
+  .listHoverCard {
     animation: none;
     transition: none;
+  }
+
+  .sessionRow:hover .titleText,
+  .sessionRow.menuOpen .titleText {
+    animation: none;
   }
 }

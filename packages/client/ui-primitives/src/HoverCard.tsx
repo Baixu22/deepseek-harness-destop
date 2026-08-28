@@ -1,7 +1,7 @@
 // HoverCard: delayed hover-preview card portaled to document.body.
 // Same portal mechanics as Menu: the wrapper span supplies the anchor rect,
-// the card is fixed-positioned at its right edge and repositions on
-// scroll/resize while open. The card is reachable: it takes pointer events,
+// the card is fixed-positioned beside the anchor (right by default, or above
+// it centered) and repositions on scroll/resize while open. The card is reachable: it takes pointer events,
 // and leaving the anchor only arms a grace-delayed close, so the pointer can
 // cross the 8px gap and settle on the card to read a clipped path or title.
 // The portaled card is a React child of the wrapper, so React's enter/leave
@@ -20,6 +20,9 @@ import css from './HoverCard.module.css'
  * @param props.anchor - the hover target (rendered in place inside a wrapper span).
  * @param props.content - card content; the pointer may rest on it, so it is
  * readable and selectable, but it carries no dismissal affordance of its own.
+ * @param props.side - which side of the anchor the card opens on: to the
+ * right at the anchor's top (default), or above/below it horizontally
+ * centered.
  * @param props.openDelayMs - hover dwell before the card shows (default 500).
  * @param props.disabled - suppress opening; turning true closes an open card.
  * @param props.copyText - optional primary value copied by activation and
@@ -29,11 +32,12 @@ import css from './HoverCard.module.css'
  * @returns anchor wrapper with the conditional portaled card.
  */
 export function HoverCard({
-  anchor, content, openDelayMs = 500, disabled = false,
+  anchor, content, side = 'right', openDelayMs = 500, disabled = false,
   copyText, copyLabel = '复制', copiedLabel = '复制成功',
 }: {
   anchor: ReactNode
   content: ReactNode
+  side?: 'right' | 'top' | 'bottom'
   openDelayMs?: number
   disabled?: boolean
   copyText?: string | undefined
@@ -44,7 +48,6 @@ export function HoverCard({
   const cardRef = useRef<HTMLDivElement>(null)
   const timerRef = useRef<ReturnType<typeof setTimeout> | null>(null)
   const copyTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null)
-  const copyHeightRef = useRef<number | null>(null)
   const copyEpochRef = useRef(0)
   const copyingRef = useRef(false)
   const mountedRef = useRef(true)
@@ -57,7 +60,6 @@ export function HoverCard({
       clearTimeout(copyTimerRef.current)
       copyTimerRef.current = null
     }
-    copyHeightRef.current = null
     setCopied(false)
   }, [])
 
@@ -107,6 +109,18 @@ export function HoverCard({
       if (wrapper === null) return
       const r = wrapper.getBoundingClientRect()
       const h = cardRef.current?.offsetHeight ?? 0
+      if (side === 'top' || side === 'bottom') {
+        // Above or below the anchor, centered on it, clamped into the
+        // viewport with an 8px margin; the card's own width drives the
+        // horizontal clamp.
+        const w = cardRef.current?.offsetWidth ?? 244
+        const left = Math.min(Math.max(8, r.left + r.width / 2 - w / 2), window.innerWidth - w - 8)
+        const top = side === 'top'
+          ? Math.max(8, r.top - h - 8)
+          : Math.min(r.bottom + 8, window.innerHeight - h - 8)
+        setPos({ left, top })
+        return
+      }
       const top = r.top + h > window.innerHeight - 8 ? window.innerHeight - h - 8 : r.top
       setPos({ left: r.right + 8, top })
     }
@@ -117,7 +131,7 @@ export function HoverCard({
       window.removeEventListener('scroll', place, true)
       window.removeEventListener('resize', place)
     }
-  }, [open])
+  }, [open, side])
 
   // The first placement ran before the card mounted (height read 0): once the
   // card's real height is measurable, correct the bottom-edge clamp. The
@@ -129,7 +143,7 @@ export function HoverCard({
     if (pos.top + h > window.innerHeight - 8) {
       setPos({ left: pos.left, top: window.innerHeight - h - 8 })
     }
-  }, [open, pos])
+  }, [open, pos, side])
 
   const copy = async (text: string): Promise<void> => {
     if (copied || copyingRef.current) return
@@ -137,10 +151,7 @@ export function HoverCard({
     const copyEpoch = copyEpochRef.current
     const accepted = await writeClipboard(text)
     copyingRef.current = false
-    const card = cardRef.current
-    if (!accepted || !mountedRef.current || copyEpoch !== copyEpochRef.current || card === null) return
-    const height = card.offsetHeight
-    copyHeightRef.current = height > 0 ? height : null
+    if (!accepted || !mountedRef.current || copyEpoch !== copyEpochRef.current || cardRef.current === null) return
     setCopied(true)
     copyTimerRef.current = setTimeout(clearCopied, 1000)
   }
@@ -149,8 +160,8 @@ export function HoverCard({
   const card = open && pos !== null && (
     <div
       ref={cardRef}
-      className={`${css.card}${copyable ? ` ${css.copyable}` : ''}${copied ? ` ${css.feedback}` : ''}`}
-      style={{ ...pos, minHeight: copied && copyHeightRef.current !== null ? copyHeightRef.current : undefined }}
+      className={`${css.card}${copyable ? ` ${css.copyable}` : ''}`}
+      style={pos}
       role={copyable ? 'button' : undefined}
       tabIndex={copyable ? 0 : undefined}
       aria-label={copyable ? `${copyLabel}: ${copyText}` : undefined}
@@ -173,7 +184,8 @@ export function HoverCard({
         }
         : undefined}
     >
-      {copied ? <span className={css.copied} aria-hidden="true">{copiedLabel}</span> : content}
+      {content}
+      {copied && <span className={css.copied} aria-hidden="true">{copiedLabel}</span>}
     </div>
   )
 

@@ -7,6 +7,7 @@ import type {
 } from '@deepseek-ai/dsh-client-modules/client'
 import { afterEach, describe, expect, it, vi } from 'vitest'
 import { AppWebEntry } from '../src/boot.ts'
+import { BOOT_REVEAL_MIN_MS } from '../src/boot-page.ts'
 
 const MODULES_ID = '@deepseek-ai/dsh-client-modules'
 const win = globalThis as DshWindow
@@ -79,57 +80,87 @@ describe('bootstrap failure rendering', () => {
   })
 })
 
+/** Three-entry graph whose renderer provides a mount spy; returns the spy's event log. */
+function installActivationFixture(): {
+  container: HTMLDivElement
+  events: string[]
+  entry: AppWebEntry
+} {
+  const events: string[] = []
+  const container = document.createElement('div')
+  document.body.append(container)
+  const target = installFacade()
+  const entries: WebBootEntry[] = [
+    { id: 'consumer', url: '/consumer.js', rev: '1' },
+    { id: MODULES_ID, url: '/modules.js', rev: '1' },
+    { id: 'renderer', url: '/renderer.js', rev: '1' },
+  ]
+  win.__DSH_BOOT__ = { rev: 'graph', entries }
+  const registrations = new Map<string, ClientBundleRegistration>([
+    ['/consumer.js', {
+      id: 'consumer',
+      factory: () => ({
+        inject: ['modules'],
+        apply: (ctx: Context) => {
+          expect(ctx.modules).toBeDefined()
+          events.push('consumer')
+        },
+      }),
+    }],
+    ['/renderer.js', {
+      id: 'renderer',
+      factory: () => ({
+        apply: (ctx: Context) => {
+          ctx.reflect.provide('uiRenderer', {
+            mount: (element: HTMLElement) => {
+              events.push('mount')
+              element.textContent = 'mounted'
+              return () => {}
+            },
+          })
+        },
+      }),
+    }],
+  ])
+  const entry = new AppWebEntry(container, {
+    loadBundle: async (url) => {
+      const registration = registrations.get(url)
+      if (registration === undefined) throw new Error(`missing fixture registration ${url}`)
+      target.load(registration)
+    },
+  })
+  return { container, events, entry }
+}
+
 describe('plugin activation', () => {
   it('allows a modules-dependent row to be created before the modules row', async () => {
-    const events: string[] = []
-    const container = document.createElement('div')
-    document.body.append(container)
-    const target = installFacade()
-    const entries: WebBootEntry[] = [
-      { id: 'consumer', url: '/consumer.js', rev: '1' },
-      { id: MODULES_ID, url: '/modules.js', rev: '1' },
-      { id: 'renderer', url: '/renderer.js', rev: '1' },
-    ]
-    win.__DSH_BOOT__ = { rev: 'graph', entries }
-    const registrations = new Map<string, ClientBundleRegistration>([
-      ['/consumer.js', {
-        id: 'consumer',
-        factory: () => ({
-          inject: ['modules'],
-          apply: (ctx: Context) => {
-            expect(ctx.modules).toBeDefined()
-            events.push('consumer')
-          },
-        }),
-      }],
-      ['/renderer.js', {
-        id: 'renderer',
-        factory: () => ({
-          apply: (ctx: Context) => {
-            ctx.reflect.provide('uiRenderer', {
-              mount: (element: HTMLElement) => {
-                events.push('mount')
-                element.textContent = 'mounted'
-                return () => {}
-              },
-            })
-          },
-        }),
-      }],
-    ])
-    const entry = new AppWebEntry(container, {
-      loadBundle: async (url) => {
-        const registration = registrations.get(url)
-        if (registration === undefined) throw new Error(`missing fixture registration ${url}`)
-        target.load(registration)
-      },
-    })
+    const { container, events, entry } = installActivationFixture()
 
     await entry.run()
 
-    expect(target.mode).toBe('live')
+    expect(win.__ModuleLoader__?.mode).toBe('live')
     expect(events).toEqual(['consumer', 'mount'])
     expect(container.textContent).toBe('mounted')
     await entry.dispose()
+  })
+})
+
+describe('reveal handoff gating', () => {
+  it('mounts only after the reveal playback settles', async () => {
+    vi.stubGlobal('requestAnimationFrame', () => 0)
+    vi.useFakeTimers()
+    try {
+      const { events, entry } = installActivationFixture()
+      const running = entry.run()
+      await vi.advanceTimersByTimeAsync(BOOT_REVEAL_MIN_MS - 200)
+      expect(events).toEqual(['consumer'])
+      await vi.advanceTimersByTimeAsync(400)
+      expect(events).toEqual(['consumer', 'mount'])
+      await running
+      await entry.dispose()
+    } finally {
+      vi.useRealTimers()
+      vi.unstubAllGlobals()
+    }
   })
 })

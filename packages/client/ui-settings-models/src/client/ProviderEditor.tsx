@@ -448,7 +448,7 @@ export function ProviderEditor(props: ProviderEditorProps): ReactNode {
                     placeholder={t('customApiUnset')}
                     ariaLabel={t('customApi')}
                     disabled={disabled}
-                    onChange={next => { if (next.length > 0) setField('api', next[0]) }}
+                    onChange={(next) => { if (next.length > 0) setField('api', next[0]) }}
                   />
                 </div>
               )

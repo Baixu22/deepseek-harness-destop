@@ -50,6 +50,7 @@ export function ReasoningRow({ text, running, t }: { text: string; running: bool
         open={expanded}
         expandable
         expandOnRowClick
+        morphBody
         onToggle={() => { setExpanded(value => !value) }}
         collapsedContent={(
           <>

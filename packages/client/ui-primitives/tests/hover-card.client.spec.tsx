@@ -207,12 +207,15 @@ describe('HoverCard', () => {
       const status = screen.getByRole('status')
       expect(status.textContent).toBe('')
       expect(card.contains(status)).toBe(false)
-      Object.defineProperty(card, 'offsetHeight', { configurable: true, value: 96 })
       await act(async () => { fireEvent.click(card) })
       expect(writeText).toHaveBeenCalledWith('/full/path')
       expect(status.textContent).toBe('Copied')
       expect(screen.getByRole('button', { name: 'Copy path: /full/path' })).toBe(card)
-      expect(card.style.minHeight).toBe('96px')
+      // The feedback is a small overlay pill: the preview content stays
+      // fully present and the card keeps its natural height.
+      expect(screen.getByText('card body')).toBeTruthy()
+      expect(screen.getAllByText('Copied')).toHaveLength(2)
+      expect(card.style.minHeight).toBe('')
       // Repeated activation while feedback is visible neither rewrites nor
       // extends the one-second success window.
       await act(async () => { fireEvent.click(card) })
@@ -221,8 +224,8 @@ describe('HoverCard', () => {
       expect(status.textContent).toBe('Copied')
       act(() => { vi.advanceTimersByTime(1) })
       expect(screen.getByRole('button', { name: 'Copy path: /full/path' })).toBe(card)
-      expect(card.style.minHeight).toBe('')
       expect(status.textContent).toBe('')
+      expect(screen.queryAllByText('Copied')).toHaveLength(0)
       expect(screen.getByText('card body')).toBeTruthy()
     } finally {
       restoreClipboard()
